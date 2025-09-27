@@ -717,7 +717,7 @@ const MigakuGPT = {
 
   loadApprovedResources: async () => {
     try {
-      const response = await fetch('https://raw.githubusercontent.com/wa-ra-ki/Migaku-Exporter/main/japanese_videos_batch.json');
+      const response = await fetch('https://raw.githubusercontent.com/wa-ra-ki/Migaku-Exporter/main/Approved-Links/japanese_videos_batch.json');
       if (response.ok) {
         MigakuGPT.approvedResources = await response.json();
         Utils.log("Loaded approved resources for MigakuGPT");
@@ -4641,4 +4641,5 @@ window.MigakuGPT = MigakuGPT;
   };
 
   tryInitialization();
+
 })();
