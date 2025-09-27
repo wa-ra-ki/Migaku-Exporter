@@ -3836,7 +3836,7 @@ const UI = {
 
     fabMenu.innerHTML = `
       <div class="mgk-plus-item" id="mgkComingSoon" style="padding:12px 16px;color:var(--text-primary);font-size:0.9rem;cursor:pointer;transition:all 0.2s ease;font-weight:500;">Coming Soon</div>
-      <div class="mgk-plus-item" id="mgkOpenMigakuGPT" style="padding:12px 16px;color:var(--text-primary);font-size:0.9rem;cursor:pointer;transition:all 0.2s ease;font-weight:500;">MigakuGPT</div>
+      <div class="mgk-plus-item" id="mgkOpenMigakuGPT" style="padding:12px 16px;color:var(--text-primary);font-size:0.9rem;cursor:pointer;transition:all 0.2s ease;font-weight:500;">MigakuGPT (beta)</div>
       <div class="mgk-plus-item" id="mgkOpenExporter" style="padding:12px 16px;color:var(--text-primary);font-size:0.9rem;cursor:pointer;transition:all 0.2s ease;font-weight:500;">Migaku Exporter</div>
     `;
 
@@ -4643,4 +4643,5 @@ window.MigakuGPT = MigakuGPT;
   tryInitialization();
 
 })();
+
 
