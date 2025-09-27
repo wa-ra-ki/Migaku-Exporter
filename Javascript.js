@@ -4,7 +4,7 @@
 // @match       https://study.migaku.com/*
 // @grant       GM_getResourceURL
 // @run-at      document-idle
-// @version     3.2.0
+// @version     2
 // @author      waraki (Forked From SirOlaf)
 // @description Migaku → Anki exporter with MigakuGPT
 // @require     data:application/javascript,%3BglobalThis.setImmediate%3DsetTimeout%3B
@@ -4643,3 +4643,4 @@ window.MigakuGPT = MigakuGPT;
   tryInitialization();
 
 })();
+
