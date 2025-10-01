@@ -30,7 +30,7 @@ const CONFIG = {
 
   MIGAKU_FIELDS: [
     'Word', 'Sentence', 'Translated Sentence', 'Definitions',
-    'Example Sentences', 'Notes', 'Images', 'Audio'
+    'Example Sentences', 'Notes', 'Images', 'Word Audio', 'Sentence Audio'
   ],
 
   FORBIDDEN_PATTERNS: /\b(migaku|academy|fundamentals|course|lesson)\b/i,
@@ -4395,7 +4395,7 @@ async function initializeMigakuExporter() {
     const lang = Utils.safeGetElement("main.MIGAKU-SRS")?.getAttribute?.("data-mgk-lang-selected") || null;
     UI.populateDeckListAndWire(decks, lang);
 
- 
+
     const settings = {
       simpleMode: true,
       includeImages: true,
@@ -4643,5 +4643,4 @@ window.MigakuGPT = MigakuGPT;
   tryInitialization();
 
 })();
-
 
