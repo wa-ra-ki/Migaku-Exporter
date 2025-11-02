@@ -13,9 +13,6 @@
 // @require     https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js
 // ==/UserScript==
 
-
-// CONSTANTS & CONFIGURATION
-
 const CONFIG = {
   STATUS_ELEMENT_ID: "mgkexporterStatusMessage",
   MEDIA_STORE_NAME: "mediacache",
@@ -54,8 +51,6 @@ const CONFIG = {
   }
 };
 
-// UTILITY FUNCTIONS
-
 const Utils = {
   log: (...args) => console.log("[Migaku Export]", ...args),
 
@@ -64,10 +59,11 @@ const Utils = {
       const el = document.getElementById(CONFIG.STATUS_ELEMENT_ID);
       if (el) {
         el.innerText = text;
-        el.style.color = color || "";
+        if(color) el.style.color = color;
       }
       Utils.log(text);
     } catch (error) {
+      // element might not be in DOM yet, happens sometimes on initial load
       console.warn("[MGK] setStatus failed:", error);
     }
   },
@@ -85,12 +81,13 @@ const Utils = {
     try {
       if (!elOrSelector) return;
       let el = elOrSelector;
-      if (typeof el === "string") el = document.querySelector(el);
+      if(typeof el === "string") el = document.querySelector(el);
       if (!el) return;
 
-      if (typeof el.addEventListener === "function") {
+      if(typeof el.addEventListener === "function") {
         el.addEventListener(eventName, handler, options);
-      } else if (typeof el.onclick === "undefined" && eventName === "click") {
+      } else if(typeof el.onclick === "undefined" && eventName === "click"){
+        // fallback for older browsers
         el.onclick = handler;
       }
     } catch (e) {
@@ -98,10 +95,11 @@ const Utils = {
     }
   },
 
+  // https://stackoverflow.com/a/2117523
   createUUID: () => {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-      const r = Math.random() * 16 | 0;
-      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      var r = Math.random() * 16 | 0;
+      var v = c === 'x' ? r : (r & 0x3 | 0x8);
       return v.toString(16);
     });
   },
@@ -109,7 +107,7 @@ const Utils = {
   sleep: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
 
   formatBytes: (bytes) => {
-    if (bytes === 0) return '0 B';
+    if(bytes === 0) return '0 B';
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -118,13 +116,11 @@ const Utils = {
 };
 
 
-// STORAGE MANAGEMENT
-
 const Storage = {
   saveSettings: (obj) => {
     try {
-      const current = JSON.parse(localStorage.getItem(CONFIG.SETTINGS_STORAGE_KEY) || "{}");
-      const merged = { ...current, ...obj };
+      let current = JSON.parse(localStorage.getItem(CONFIG.SETTINGS_STORAGE_KEY) || "{}");
+      let merged = { ...current, ...obj };
       localStorage.setItem(CONFIG.SETTINGS_STORAGE_KEY, JSON.stringify(merged));
     } catch (error) {
       console.warn("[MGK] Failed to save settings:", error);
@@ -132,53 +128,36 @@ const Storage = {
   },
 
   loadSettings: () => {
-    try {
-      return JSON.parse(localStorage.getItem(CONFIG.SETTINGS_STORAGE_KEY) || "{}");
-    } catch {
-      return {};
-    }
+    return JSON.parse(localStorage.getItem(CONFIG.SETTINGS_STORAGE_KEY) || "{}");
   },
 
   saveMappings: (map) => {
-    try {
-      localStorage.setItem(CONFIG.MAPPING_STORAGE_KEY, JSON.stringify(map || {}));
-    } catch (error) {
-      console.warn("[MGK] Failed to save mappings:", error);
-    }
+    localStorage.setItem(CONFIG.MAPPING_STORAGE_KEY, JSON.stringify(map || {}));
   },
 
   loadMappings: () => {
     try {
       return JSON.parse(localStorage.getItem(CONFIG.MAPPING_STORAGE_KEY) || "{}");
-    } catch {
+    } catch (e) {
       return {};
     }
   },
 
   saveApiKey: (key) => {
-    try {
-      localStorage.setItem(CONFIG.CHAT_API_KEY_STORAGE, key);
-    } catch (error) {
-      console.warn("[MGK] Failed to save API key:", error);
-    }
+    localStorage.setItem(CONFIG.CHAT_API_KEY_STORAGE, key);
   },
 
   loadApiKey: () => {
-    try {
-      return localStorage.getItem(CONFIG.CHAT_API_KEY_STORAGE) || "";
-    } catch {
-      return "";
-    }
+    return localStorage.getItem(CONFIG.CHAT_API_KEY_STORAGE) || "";
   }
 };
 
-// PROGRESS UI MANAGEMENT
-
+// Progress UI
 const Progress = {
   ensureUI: () => {
-    if (document.getElementById("mgkProgressContainer")) return;
+    if(document.getElementById("mgkProgressContainer")) return;
     const container = Utils.safeGetElement(CONFIG.MODAL_ID)?.querySelector(".mgk-controls");
-    if (!container) return;
+    if(!container) return;
 
     const wrap = document.createElement("div");
     wrap.id = "mgkProgressContainer";
@@ -197,50 +176,50 @@ const Progress = {
 
   show: (label = "Starting...", percent = 0) => {
     Progress.ensureUI();
-    const container = Utils.safeGetElement("mgkProgressContainer");
-    if (container) container.style.display = "block";
+    var container = Utils.safeGetElement("mgkProgressContainer");
+    if(container) container.style.display = "block";
     Progress.set(percent, label);
   },
 
   hide: () => {
-    const container = Utils.safeGetElement("mgkProgressContainer");
-    if (container) container.style.display = "none";
+    var container = Utils.safeGetElement("mgkProgressContainer");
+    if(container) container.style.display = "none";
     Progress.set(0, "Idle");
   },
 
   set: (percent = 0, label = "") => {
     Progress.ensureUI();
-    const bar = Utils.safeGetElement("mgkProgressBar");
-    const labelEl = Utils.safeGetElement("mgkProgressLabel");
-    const pctEl = Utils.safeGetElement("mgkProgressPercent");
+    var bar = Utils.safeGetElement("mgkProgressBar");
+    var labelEl = Utils.safeGetElement("mgkProgressLabel");
+    var pctEl = Utils.safeGetElement("mgkProgressPercent");
 
-    if (bar) bar.style.width = `${Math.max(0, Math.min(100, percent))}%`;
-    if (labelEl) labelEl.innerText = label || "";
-    if (pctEl) pctEl.innerText = `${Math.round(percent)}%`;
-    if (label) Utils.setStatus(label);
+    if(bar) bar.style.width = `${Math.max(0, Math.min(100, percent))}%`;
+    if(labelEl) labelEl.innerText = label || "";
+    if(pctEl) pctEl.innerText = `${Math.round(percent)}%`;
+    if(label) Utils.setStatus(label);
   }
 };
 
-// COMPRESSION & MEDIA UTILITIES
-
+// media processing functions
 const MediaProcessor = {
+  // decompress gzip - needed for migaku's db format
   async decompressBlobGzip(blob) {
     const ds = new DecompressionStream("gzip");
     const decompressedStream = blob.stream().pipeThrough(ds);
     const reader = decompressedStream.getReader();
-    const chunks = [];
+    let chunks = [];
     let totalSize = 0;
 
-    while (true) {
+    while(true) {
       const { value, done } = await reader.read();
-      if (done) break;
+      if(done) break;
       chunks.push(value);
       totalSize += value.byteLength;
     }
 
-    const out = new Uint8Array(totalSize);
+    let out = new Uint8Array(totalSize);
     let offset = 0;
-    for (const chunk of chunks) {
+    for(const chunk of chunks) {
       out.set(chunk, offset);
       offset += chunk.byteLength;
     }
@@ -249,17 +228,17 @@ const MediaProcessor = {
 
   imageResizeToBlob(imgBlob, maxDim = 1024, quality = 0.85) {
     return new Promise((resolve) => {
-      const img = new Image();
+      var img = new Image();
       img.onload = async () => {
         let w = img.naturalWidth, h = img.naturalHeight;
-        const scale = Math.min(1, maxDim / Math.max(w, h));
+        var scale = Math.min(1, maxDim / Math.max(w, h));
         w = Math.round(w * scale);
         h = Math.round(h * scale);
 
-        const canvas = document.createElement("canvas");
+        var canvas = document.createElement("canvas");
         canvas.width = w;
         canvas.height = h;
-        const ctx = canvas.getContext("2d");
+        var ctx = canvas.getContext("2d");
         ctx.drawImage(img, 0, 0, w, h);
         canvas.toBlob((b) => resolve(b), "image/jpeg", quality);
       };
@@ -270,8 +249,8 @@ const MediaProcessor = {
 
   async decodeAudioBlobToBuffer(blob) {
     try {
-      const arrayBuffer = await blob.arrayBuffer();
-      const ctx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 1, 44100);
+      var arrayBuffer = await blob.arrayBuffer();
+      var ctx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 1, 44100);
       return await ctx.decodeAudioData(arrayBuffer);
     } catch (e) {
       console.warn("Audio decode failed", e);
@@ -280,16 +259,15 @@ const MediaProcessor = {
   }
 };
 
-// FIREBASE AUTHENTICATION
-
+// firebase auth to get media from migaku's servers
 const FirebaseAuth = {
   getFirebaseLocalStorageRows() {
     return new Promise(resolve => {
-      const req = indexedDB.open("firebaseLocalStorageDb", 1);
+      var req = indexedDB.open("firebaseLocalStorageDb", 1);
       req.onsuccess = () => {
-        const idb = req.result;
-        const tx = idb.transaction("firebaseLocalStorage", "readonly");
-        const store = tx.objectStore("firebaseLocalStorage");
+        var idb = req.result;
+        var tx = idb.transaction("firebaseLocalStorage", "readonly");
+        var store = tx.objectStore("firebaseLocalStorage");
         store.getAll().onsuccess = ev => resolve(ev.target.result);
         idb.close();
       };
@@ -299,7 +277,7 @@ const FirebaseAuth = {
 
   async exchangeRefreshToken(apiKey, refreshToken) {
     const url = `https://securetoken.googleapis.com/v1/token?key=${apiKey}`;
-    const resp = await fetch(url, {
+    var resp = await fetch(url, {
       method: "POST",
       body: new URLSearchParams({
         grant_type: "refresh_token",
@@ -310,40 +288,40 @@ const FirebaseAuth = {
   },
 
   async getAccessToken() {
-    const rows = await FirebaseAuth.getFirebaseLocalStorageRows();
-    if (!rows || rows.length === 0) {
+    var rows = await FirebaseAuth.getFirebaseLocalStorageRows();
+    if(!rows || rows.length === 0) {
       throw new Error("Firebase info missing (can't fetch media).");
     }
 
-    const info = rows[0].value;
-    const tokenResp = await FirebaseAuth.exchangeRefreshToken(
+    var info = rows[0].value;
+    var tokenResp = await FirebaseAuth.exchangeRefreshToken(
       info.apiKey,
       info.stsTokenManager.refreshToken
     );
-    const expiresAt = Date.now() + (Number(tokenResp.expires_in) - 5) * 1000;
+    var expiresAt = Date.now() + (Number(tokenResp.expires_in) - 5) * 1000;
     return { token: tokenResp.access_token, expiresAt };
   }
 };
 
-// DATABASE OPERATIONS
-
+// database query helpers
 const DatabaseOps = {
+  // load and decompress the srs database from indexeddb
   loadRawSrsDatabaseBlob() {
     return new Promise((resolve) => {
-      const dbRequest = indexedDB.open("srs", 1);
-      dbRequest.onsuccess = function () {
-        const idb = dbRequest.result;
-        const transaction = idb.transaction("data", "readonly");
-        const objectStore = transaction.objectStore("data");
-        const cursorRequest = objectStore.openCursor();
+      var dbRequest = indexedDB.open("srs", 1);
+      dbRequest.onsuccess = function() {
+        var idb = dbRequest.result;
+        var transaction = idb.transaction("data", "readonly");
+        var objectStore = transaction.objectStore("data");
+        var cursorRequest = objectStore.openCursor();
 
-        cursorRequest.onsuccess = async function () {
-          const cursor = cursorRequest.result;
-          if (cursor) {
+        cursorRequest.onsuccess = async function() {
+          var cursor = cursorRequest.result;
+          if(cursor) {
             try {
-              const data = cursor.value.data;
-              const blob = new Blob([data], { type: "application/octet-stream" });
-              const decompressed = await MediaProcessor.decompressBlobGzip(blob);
+              var data = cursor.value.data;
+              var blob = new Blob([data], { type: "application/octet-stream" });
+              var decompressed = await MediaProcessor.decompressBlobGzip(blob);
               resolve(decompressed);
             } catch (err) {
               console.error("Error decompressing srs DB blob:", err);
@@ -354,7 +332,7 @@ const DatabaseOps = {
           }
           try { idb.close(); } catch (e) {}
         };
-        cursorRequest.onerror = function () {
+        cursorRequest.onerror = function() {
           resolve(null);
           try { idb.close(); } catch (e) {}
         };
@@ -374,7 +352,7 @@ const DatabaseOps = {
 
   sqlExecToObjects(result) {
     if (!result) return [];
-    const res = [];
+    var res = [];
     for (const val of result.values) {
       res.push(DatabaseOps.rowArrayToObject(result.columns, val));
     }
@@ -383,7 +361,7 @@ const DatabaseOps = {
 
   runQueryToObjects(db, query, params) {
     try {
-      const result = db.exec(query, params)[0];
+      var result = db.exec(query, params)[0];
       return DatabaseOps.sqlExecToObjects(result);
     } catch (e) {
       return [];
@@ -415,8 +393,8 @@ const DatabaseOps = {
   },
 
   readCardTypes(db) {
-    const rows = DatabaseOps.runQueryToObjects(db, "SELECT id, del, lang, name, config FROM card_type");
-    const map = new Map();
+    var rows = DatabaseOps.runQueryToObjects(db, "SELECT id, del, lang, name, config FROM card_type");
+    var map = new Map();
 
     for (const r of rows) {
       try {
@@ -425,6 +403,7 @@ const DatabaseOps = {
         r.config = {};
       }
 
+      // make sure fields array exists and has at least one field
       if (!Array.isArray(r.config.fields) || r.config.fields.length === 0) {
         r.config.fields = [{ name: "Field1", type: "TEXT" }];
       } else {
@@ -440,18 +419,18 @@ const DatabaseOps = {
 
   getUserLearningData(db) {
     try {
-      const decks = DatabaseOps.listDecks(db);
-      const allCards = [];
+      var decks = DatabaseOps.listDecks(db);
+      var allCards = [];
 
       for (const deck of decks.filter(d => !d.del)) {
-        const cards = DatabaseOps.listCardsForDeck(db, deck.id);
+        var cards = DatabaseOps.listCardsForDeck(db, deck.id);
         allCards.push(...cards.map(card => ({ ...card, deckName: deck.name, deckLang: deck.lang })));
       }
 
-      const languages = [...new Set(decks.map(d => d.lang).filter(Boolean))];
+      var languages = [...new Set(decks.map(d => d.lang).filter(Boolean))];
       const wordLists = {};
 
-      for (const lang of languages) {
+      for(const lang of languages) {
         wordLists[lang] = DatabaseOps.listWordListForLanguage(db, lang);
       }
 
@@ -468,14 +447,13 @@ const DatabaseOps = {
   }
 };
 
-// FIELD MAPPING
-
+// field name mapping
 const FieldMapper = {
   getFieldNames: () => {
-    const mappings = Storage.loadMappings();
-    const globalMapping = mappings["__global__"] || mappings.__global;
+    var mappings = Storage.loadMappings();
+    var globalMapping = mappings["__global__"] || mappings.__global;
 
-    if (globalMapping && globalMapping.fields && Array.isArray(globalMapping.fields)) {
+    if(globalMapping && globalMapping.fields && Array.isArray(globalMapping.fields)) {
       return globalMapping.fields.map(f => f.ankiName || f.migakuName);
     }
 
@@ -483,28 +461,29 @@ const FieldMapper = {
   },
 
   buildFieldValues: async (card, cardType, settings, ensureMediaInZip) => {
-    const rawFields = [
+    var rawFields = [
       card.primaryField || "",
       card.secondaryField || "",
       ...(card.fields ? card.fields.split("\u001f") : [])
     ];
 
-    const fieldNames = FieldMapper.getFieldNames();
-    const processedFields = [];
+    var fieldNames = FieldMapper.getFieldNames();
+    var processedFields = [];
 
-    for (let i = 0; i < fieldNames.length; i++) {
-      const fieldName = fieldNames[i];
-      let rawValue = rawFields[i] || "";
-      const lowerName = fieldName.toLowerCase();
+    for(let i = 0; i < fieldNames.length; i++) {
+      var fieldName = fieldNames[i];
+      var rawValue = rawFields[i] || "";
+      var lowerName = fieldName.toLowerCase();
 
-      if (lowerName.includes("image") && settings.includeImages && rawValue) {
-        const mediaName = await ensureMediaInZip(rawValue);
+      if(lowerName.includes("image") && settings.includeImages && rawValue) {
+        var mediaName = await ensureMediaInZip(rawValue);
         processedFields.push(mediaName ? `<img src="${mediaName}">` : "");
-      } else if (lowerName.includes("audio") && settings.includeAudio && rawValue) {
-        const mediaName = await ensureMediaInZip(rawValue);
+      } else if(lowerName.includes("audio") && settings.includeAudio && rawValue) {
+        var mediaName = await ensureMediaInZip(rawValue);
         processedFields.push(mediaName ? `[sound:${mediaName}]` : "");
       } else {
-        if (!settings.keepSyntax && rawValue) {
+        if(!settings.keepSyntax && rawValue) {
+          // strip out migaku's bracket syntax
           rawValue = rawValue.replaceAll(/\[.*?\]/g, "").replaceAll(/[{}]/g, "");
         }
         processedFields.push(rawValue);
@@ -517,28 +496,26 @@ const FieldMapper = {
   getExpectedFieldCount: () => FieldMapper.getFieldNames().length
 };
 
-// COURSE/ACADEMY DECK PROTECTION
-
+// protect against exporting academy courses (migaku doesn't want these redistributed)
 const DeckProtection = {
   checkForbiddenContent: (cardTypes) => {
     return cardTypes.some(ct => {
-      const name = (ct && ct.name) ? String(ct.name) : "";
+      var name = (ct && ct.name) ? String(ct.name) : '';
       return CONFIG.FORBIDDEN_PATTERNS.test(name);
     });
   },
 
   getForbiddenMessage: () => {
-    return "Migaku Academy/Fundamentals Course Content is not allowed to be exported! " +
-           "If you are not exporting a Migaku course and see this error message, " +
-           "please report it at: https://github.com/wa-ra-ki/Migaku-Exporter/issues";
+    return 'Migaku Academy/Fundamentals Course Content is not allowed to be exported! ' +
+           'If you are not exporting a Migaku course and see this error message, ' +
+           'please report it at: https://github.com/wa-ra-ki/Migaku-Exporter/issues';
   }
 };
 
-// ANKI DATABASE CREATION
-
+// anki db creation
 const AnkiBuilder = {
   createEmptyAnkiDb(SQL) {
-    const db = new SQL.Database();
+    var db = new SQL.Database();
     db.run(`
       CREATE TABLE cards (id integer primary key, nid integer not null, did integer not null, ord integer not null, mod integer not null, usn integer not null, type integer not null, queue integer not null, due integer not null, ivl integer not null, factor integer not null, reps integer not null, lapses integer not null, left integer not null, odue integer not null, odid integer not null, flags integer not null, data text not null) STRICT;
       CREATE TABLE col (id integer primary key, crt integer not null, mod integer not null, scm integer not null, ver integer not null, dty integer not null, usn integer not null, ls integer not null, conf text not null, models text not null, decks text not null, dconf text not null, tags text not null) STRICT;
@@ -557,19 +534,19 @@ const AnkiBuilder = {
   },
 
   insertCollectionMetadata(db, usedCardTypes, mappings, useTemplates) {
-    const mapping = new Map();
-    for (const ct of usedCardTypes) {
+    var mapping = new Map();
+    for(const ct of usedCardTypes) {
       mapping.set(ct.id, Number(String(Date.now()).slice(0,10) + String(ct.id)));
     }
 
-    const conf = {
+    var conf = {
       curDeck: 1,
       curModel: mapping.get(usedCardTypes[0].id).toString()
     };
 
-    const models = {};
-    for (const ct of usedCardTypes) {
-      const fields = [];
+    var models = {};
+    for(const ct of usedCardTypes) {
+      var fields = [];
 
       const fieldNames = FieldMapper.getFieldNames();
       const pushField = (name) => fields.push({
@@ -579,6 +556,7 @@ const AnkiBuilder = {
 
       fieldNames.forEach(fieldName => pushField(fieldName));
 
+      // try to create better templates based on card type
       let template;
       try {
         if (useTemplates) {
@@ -678,30 +656,67 @@ const AnkiBuilder = {
   },
 
   fillRevlogTable(db, reviews) {
-    const revIntervals = new Map();
-    reviews.sort((a,b) => a.id - b.id);
+    var revIntervals = new Map();
+    reviews.sort((a,b) => a.mod - b.mod);
+
+    // migaku counts distinct cardId per day/type, so dedupe
+    var uniqueKey = new Set();
+    var uniqueReviews = [];
+
+    for (var i = 0; i < reviews.length; i++) {
+      var r = reviews[i];
+      var key = `${r.cardId}-${r.day}-${r.type}`;
+      if (!uniqueKey.has(key)) {
+        uniqueKey.add(key);
+        uniqueReviews.push(r);
+      }
+    }
+
+    Utils.log(`fillRevlogTable: ${reviews.length} reviews → ${uniqueReviews.length} unique`);
+    var insertedByType = { 0: 0, 1: 0, 2: 0 };
+
+    // make sure review IDs are unique
+    var usedReviewIds = new Set();
+    var reviewIdCounter = 0;
+
     db.run("BEGIN TRANSACTION;");
 
-    for (const r of reviews) {
-      let ease = 0;
+    for (const r of uniqueReviews) {
+      var ease = 0;
       if (r.type === 0) ease = 2;
       else if (r.type === 1) ease = 1;
       else if (r.type === 2) ease = 3;
 
-      const prevIvl = revIntervals.has(r.cardId) ? revIntervals.get(r.cardId) : 0;
+      insertedByType[r.type] = (insertedByType[r.type] || 0) + 1;
+
+      var prevIvl = revIntervals.has(r.cardId) ? revIntervals.get(r.cardId) : 0;
+
+      var reviewId = r.mod;
+      while (usedReviewIds.has(reviewId)) {
+        reviewId++;
+        reviewIdCounter++;
+      }
+      usedReviewIds.add(reviewId);
+
+      const currentInterval = Math.round(r.interval);
+
       db.run("INSERT INTO revlog VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", [
-        r.id, r.cardId, -1, ease, Math.floor(r.interval), prevIvl,
+        reviewId, r.cardId, -1, ease, currentInterval, prevIvl,
         Math.floor(r.factor * 1000), Math.min(r.duration, 60) * 1000,
         r.type === 0 ? 0 : 1
       ]);
-      revIntervals.set(r.cardId, Math.floor(r.interval));
+      revIntervals.set(r.cardId, currentInterval);
     }
     db.run("COMMIT");
+
+    if (reviewIdCounter > 0) {
+      Utils.log(`Fixed ${reviewIdCounter} duplicate review IDs`);
+    }
+    Utils.log(`Revlog insert - New(0): ${insertedByType[0]}, Fail(1): ${insertedByType[1]}, Pass(2): ${insertedByType[2]}`);
   }
 };
 
-// MIGAKU GPT WITH VIDEO EMBEDDING & IMPROVED UI
-
+// GPT chat feature
 const MigakuGPT = {
   isOpen: false,
   chatHistory: [],
@@ -1486,6 +1501,7 @@ const MigakuGPT = {
         const messageDiv = document.createElement("div");
         messageDiv.className = `mgk-chat-message ${isUser ? 'user' : 'assistant'}`;
 
+        // simple markdown parsing
         content = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
         content = content.replace(/\*(.*?)\*/g, '<em>$1</em>');
         content = content.replace(/`(.*?)`/g, '<code style="background:rgba(255,255,255,0.1);padding:2px 6px;border-radius:4px;font-size:0.8rem;">$1</code>');
@@ -1495,7 +1511,7 @@ const MigakuGPT = {
 
         messageDiv.innerHTML = content;
 
-        if (!isUser) {
+        if(!isUser) {
             MigakuGPT.replaceYouTubeLinks(messageDiv);
         }
 
@@ -1516,6 +1532,7 @@ const MigakuGPT = {
     return content;
   },
     replaceYouTubeLinks: (container) => {
+        // regex for youtube URLs - supports youtube.com, youtu.be, mobile, embed formats
         const youtubeRegex = /https?:\/\/(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/)|youtu\.be\/|m\.youtube\.com\/watch\?v=)([a-zA-Z0-9_-]{11})/g;
 
         const walker = document.createTreeWalker(
@@ -1882,7 +1899,7 @@ const MigakuGPT = {
           container.style.transform = 'translateY(-2px)';
           container.style.boxShadow = '0 8px 25px rgba(79, 70, 229, 0.2)';
           overlay.style.opacity = '1';
-          if (img.style.display !== 'none') {
+          if(img.style.display !== 'none') {
               img.style.transform = 'scale(1.05)';
           }
           playBtn.style.background = 'linear-gradient(135deg, #4f46e5, #a855f7)';
@@ -1893,7 +1910,7 @@ const MigakuGPT = {
           container.style.transform = '';
           container.style.boxShadow = '';
           overlay.style.opacity = '0';
-          if (img.style.display !== 'none') {
+          if(img.style.display !== 'none') {
               img.style.transform = '';
           }
           playBtn.style.background = 'rgba(255, 255, 255, 0.9)';
@@ -2042,29 +2059,30 @@ const MigakuGPT = {
 
     input.value = "";
     input.style.height = "auto";
-    if (sendBtn) sendBtn.disabled = true;
+    if(sendBtn) sendBtn.disabled = true;
 
     MigakuGPT.addMessage(message, true);
     MigakuGPT.chatHistory.push({ role: "user", content: message });
 
+    // show loading
     const loadingDiv = document.createElement("div");
     loadingDiv.className = "mgk-chat-message assistant mgk-loading";
     loadingDiv.innerHTML = "Thinking...";
     const messagesContainer = Utils.safeGetElement("mgkChatMessages");
-    if (messagesContainer) messagesContainer.appendChild(loadingDiv);
+    if(messagesContainer) messagesContainer.appendChild(loadingDiv);
 
     try {
       const response = await MigakuGPT.callOpenAI(message);
-      if (loadingDiv.parentNode) loadingDiv.remove();
+      if(loadingDiv.parentNode) loadingDiv.remove();
       MigakuGPT.addMessage(response);
       MigakuGPT.chatHistory.push({ role: "assistant", content: response });
     } catch (error) {
-      if (loadingDiv.parentNode) loadingDiv.remove();
+      if(loadingDiv.parentNode) loadingDiv.remove();
       MigakuGPT.addMessage(`Error: ${error.message}. Please check your API key.`);
     }
 
-    if (sendBtn) sendBtn.disabled = false;
-    if (input) input.focus();
+    if(sendBtn) sendBtn.disabled = false;
+    if(input) input.focus();
   },
 
   callOpenAI: async (message) => {
@@ -2081,7 +2099,7 @@ const MigakuGPT = {
         model: "gpt-4o-mini",
         messages: [
           { role: "system", content: systemPrompt },
-          ...MigakuGPT.chatHistory.slice(-8),
+          ...MigakuGPT.chatHistory.slice(-8), // keep last 8 for context otherwise token usage gets crazy
           { role: "user", content: message }
         ],
         functions: [
@@ -2119,7 +2137,7 @@ const MigakuGPT = {
       if (functionName === "web_search") {
         const searchResults = await MigakuGPT.performWebSearch(functionArgs.query, functionArgs.max_results || 3);
 
-
+        // send results back to gpt
         const followUpResponse = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
           headers: {
@@ -2163,6 +2181,7 @@ const MigakuGPT = {
       const searchTerms = query.toLowerCase().split(' ');
       const matchedVideos = [];
 
+      // score each video based on search terms
       for (const video of videoData) {
         let score = 0;
         const searchableText = [
@@ -2176,7 +2195,7 @@ const MigakuGPT = {
           if (searchableText.includes(term)) {
             score += 1;
             if (video.title.toLowerCase().includes(term)) {
-              score += 2;
+              score += 2; // title matches are more relevant
             }
             if (video.category.toLowerCase().includes(term)) {
               score += 1.5;
@@ -2223,6 +2242,7 @@ const MigakuGPT = {
   },
 
   getCuratedVideoSuggestions: (query, maxResults = 3) => {
+    // fallback videos if json fetch fails
     const fallbackData = [
       {
         title: "Japanese Grammar Basics for Beginners",
@@ -2383,8 +2403,7 @@ Use this data to provide personalized recommendations.`;
   }
 };
 
-// FIELD MAPPING MODAL
-
+// field mapping config UI
 const MappingModal = {
   create: () => {
     if (document.getElementById(CONFIG.MAPPING_MODAL_ID)) return;
@@ -2622,8 +2641,7 @@ renderGlobalMapping: () => {
   }
 };
 
-// MEDIA HANDLING & PROCESSING
-
+// media download and caching
 const MediaHandler = {
   async fetchRemoteMediaBlob(path, auth) {
     if (!auth) auth = await FirebaseAuth.getAccessToken().catch(() => null);
@@ -2661,21 +2679,21 @@ const MediaHandler = {
           });
         }
       };
-      req.onsuccess = (ev) => resolve(ev.target.result);
-      req.onerror = () => resolve(null);
+      req.onsuccess = (ev) => resolve(ev.target.result)
+      req.onerror = () => resolve(null)
     });
   },
 
   saveBlobToMediaCache(db, key, blob) {
     return new Promise(resolve => {
       try {
-        const tx = db.transaction(CONFIG.MEDIA_STORE_NAME, "readwrite");
-        const store = tx.objectStore(CONFIG.MEDIA_STORE_NAME);
-        const addReq = store.add({ key, blob });
-        addReq.onsuccess = (ev) => resolve(ev.target?.result);
-        addReq.onerror = () => resolve(null);
+        var tx = db.transaction(CONFIG.MEDIA_STORE_NAME, 'readwrite');
+        var store = tx.objectStore(CONFIG.MEDIA_STORE_NAME);
+        var addReq = store.add({ key, blob });
+        addReq.onsuccess = (ev) => resolve(ev.target?.result)
+        addReq.onerror = () => resolve(null)
       } catch {
-        resolve(null);
+        resolve(null)
       }
     });
   },
@@ -2683,19 +2701,20 @@ const MediaHandler = {
   getBlobFromMediaCache(db, key) {
     return new Promise(resolve => {
       try {
-        if (!db) return resolve(null);
-        const req = db.transaction(CONFIG.MEDIA_STORE_NAME, "readonly")
+        if(!db) return resolve(null);
+        var req = db.transaction(CONFIG.MEDIA_STORE_NAME, 'readonly')
                      .objectStore(CONFIG.MEDIA_STORE_NAME).get(key);
-        req.onsuccess = (ev) => resolve(ev.target.result ? ev.target.result.blob : null);
-        req.onerror = () => resolve(null);
+        req.onsuccess = (ev) => resolve(ev.target.result ? ev.target.result.blob : null)
+        req.onerror = () => resolve(null)
       } catch {
-        resolve(null);
+        resolve(null)
       }
     });
   },
 
   async mediaCacheHasKey(db, key) {
-    return (await MediaHandler.getBlobFromMediaCache(db, key)) !== null;
+    var result = await MediaHandler.getBlobFromMediaCache(db, key);
+    return result !== null;
   },
 
   async gatherMediaFiles(mediaDb, cardsByType, cardTypes, settings) {
@@ -2716,55 +2735,57 @@ const MediaHandler = {
           if (!value || typeof value !== "string") return;
           if (value.trim().length === 0) return;
 
-          if ((f.type === "IMAGE" && settings.includeImages) ||
-              ((f.type === "AUDIO" || f.type === "AUDIO_LONG") && settings.includeAudio)) {
-            pathSet.add(value.slice(5));
+          if((f.type === 'IMAGE' && settings.includeImages) ||
+              ((f.type === 'AUDIO' || f.type === 'AUDIO_LONG') && settings.includeAudio)) {
+            pathSet.add(value.slice(5)); // remove 'data:' prefix
           }
         };
 
         handle(card.primaryField);
         handle(card.secondaryField);
-        if (card.fields) {
-          for (const p of card.fields.split("\u001f")) handle(p);
+        if(card.fields) {
+          for(const p of card.fields.split('\u001f')) handle(p);
         }
       }
     }
 
-    Utils.setStatus("Downloading media...");
-    const queue = Array.from(pathSet);
-    const total = queue.length;
-    let done = 0;
+    Utils.setStatus('Downloading media...');
+    var queue = Array.from(pathSet);
+    var total = queue.length;
+    var done = 0;
 
-    if (total === 0) {
-      Progress.show("No media to download", 100);
+    if(total === 0) {
+      Progress.show('No media to download', 100);
       await Utils.sleep(300);
       Progress.hide();
       return new Map();
     }
 
-    Progress.show("Downloading media...", 0);
-    let access = null;
+    Progress.show('Downloading media...', 0);
+    var access = null;
     try {
       access = await FirebaseAuth.getAccessToken();
     } catch {
       access = null;
+      // console.log('Firebase auth failed, trying without token')
     }
 
-    const mediaMap = new Map();
-    const worker = async () => {
-      while (queue.length > 0) {
-        const path = queue.shift();
-        const extension = (() => {
-          const ext = "." + path.split(".").pop();
-          return ext.length >= 7 ? "" : ext;
+    var mediaMap = new Map();
+    var worker = async () => {
+      while(queue.length > 0) {
+        var path = queue.shift();
+        var extension = (() => {
+          var ext = '.' + path.split('.').pop();
+          return ext.length >= 7 ? '' : ext;
         })();
 
-        const shaBuf = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(path));
-        const shaHex = Array.from(new Uint8Array(shaBuf))
-                           .map(b => b.toString(16).padStart(2,"0"))
-                           .join("") + extension;
+        // sha1 hash for filename
+        var shaBuf = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(path));
+        var shaHex = Array.from(new Uint8Array(shaBuf))
+                           .map(b => b.toString(16).padStart(2,'0'))
+                           .join('') + extension;
 
-        if (mediaDb && await MediaHandler.mediaCacheHasKey(mediaDb, shaHex)) {
+        if(mediaDb && await MediaHandler.mediaCacheHasKey(mediaDb, shaHex)) {
           done++;
           Utils.setStatus(`${done}/${total} – from cache: ${path}`);
           Progress.set((done/total)*100, `Downloading media – ${done}/${total}`);
@@ -2772,38 +2793,38 @@ const MediaHandler = {
           continue;
         }
 
-        const blob = await MediaHandler.fetchRemoteMediaBlob(path, access);
+        var blob = await MediaHandler.fetchRemoteMediaBlob(path, access);
         done++;
         Utils.setStatus(`${done}/${total} – downloaded: ${path}`);
         Progress.set((done/total)*100, `Downloading media – ${done}/${total}`);
 
-        if (!blob) continue;
+        if(!blob) continue;
 
-        if (settings.maxMediaSizeBytes && blob.size > settings.maxMediaSizeBytes) {
-          Utils.log("Skipping large media", path, Utils.formatBytes(blob.size));
+        if(settings.maxMediaSizeBytes && blob.size > settings.maxMediaSizeBytes) {
+          Utils.log('Skipping large media', path, Utils.formatBytes(blob.size));
           continue;
         }
 
-        let outBlob = blob;
+        var outBlob = blob;
         try {
-          if (settings.convertMedia && settings.enableImageConversion &&
+          if(settings.convertMedia && settings.enableImageConversion &&
               path.match(/\.(jpg|jpeg|png|webp|gif)$/i)) {
-            const resized = await MediaProcessor.imageResizeToBlob(
+            var resized = await MediaProcessor.imageResizeToBlob(
               blob,
               settings.imageMaxDimension || 1024,
               settings.imageQuality ?? 0.85
             );
-            if (resized) outBlob = resized;
+            if(resized) outBlob = resized;
           }
         } catch (e) {
-          console.warn("Media conversion failed for", path, e);
+          console.warn('Media conversion failed for', path, e);
           outBlob = blob;
         }
 
         try {
-          if (mediaDb) await MediaHandler.saveBlobToMediaCache(mediaDb, shaHex, outBlob);
+          if(mediaDb) await MediaHandler.saveBlobToMediaCache(mediaDb, shaHex, outBlob);
         } catch (e) {
-          console.warn("Cache save failed", e);
+          console.warn('Cache save failed', e);
         }
 
         mediaMap.set(path, shaHex);
@@ -2822,29 +2843,28 @@ const MediaHandler = {
   }
 };
 
-// EXPORT PROCESSING
-
+// export logic
 const ExportProcessor = {
   async fillNotesAndCards(ankiDb, mediaDb, zip, cardsByType, cardTypes, modelMapping, settings) {
     const mediaReverseMap = new Map();
     let nextMediaIndex = 0;
 
     async function ensureMediaInZip(dirtyPath) {
-      if (!dirtyPath) return null;
-      if (!mediaDb) return null;
+      if(!dirtyPath) return null;
+      if(!mediaDb) return null;
 
-      const path = dirtyPath.slice(5);
-      let ext = "." + path.split(".").pop();
-      if (ext.length >= 7) ext = "";
+      var path = dirtyPath.slice(5);
+      var ext = '.' + path.split('.').pop();
+      if(ext.length >= 7) ext = '';
 
-      const shaBuf = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(path));
-      const shaHex = Array.from(new Uint8Array(shaBuf))
-                          .map(b => b.toString(16).padStart(2,"0"))
-                          .join("") + ext;
+      var shaBuf = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(path));
+      var shaHex = Array.from(new Uint8Array(shaBuf))
+                          .map(b => b.toString(16).padStart(2,'0'))
+                          .join('') + ext;
 
-      if (!mediaReverseMap.has(shaHex)) {
-        const blob = await MediaHandler.getBlobFromMediaCache(mediaDb, shaHex);
-        if (!blob) return null;
+      if(!mediaReverseMap.has(shaHex)) {
+        var blob = await MediaHandler.getBlobFromMediaCache(mediaDb, shaHex);
+        if(!blob) return null;
 
         zip.file(String(nextMediaIndex), blob);
         mediaReverseMap.set(shaHex, String(nextMediaIndex));
@@ -2853,57 +2873,77 @@ const ExportProcessor = {
       return shaHex;
     }
 
-    let totalCards = 0;
-    for (const l of cardsByType.values()) totalCards += l.length;
-    let processed = 0;
+    var totalCards = 0;
+    for(const l of cardsByType.values()) totalCards += l.length;
+    var processed = 0;
 
-    if (totalCards > 0) Progress.show("Converting cards...", 0);
-    else Progress.show("No cards to convert", 100);
+    if(totalCards > 0) Progress.show('Converting cards...', 0);
+    else Progress.show('No cards to convert', 100);
 
-    ankiDb.run("BEGIN TRANSACTION;");
+    ankiDb.run('BEGIN TRANSACTION;');
 
-    for (const typeKey of cardsByType.keys()) {
-      const modelId = modelMapping.get(typeKey);
-      const list = cardsByType.get(typeKey);
-      const ct = cardTypes.get(typeKey);
+    for(const typeKey of cardsByType.keys()) {
+      var modelId = modelMapping.get(typeKey);
+      var list = cardsByType.get(typeKey);
+      var ct = cardTypes.get(typeKey);
 
-      for (const card of list) {
-        const finalFieldValues = await FieldMapper.buildFieldValues(
+      for(const card of list) {
+        var finalFieldValues = await FieldMapper.buildFieldValues(
           card, ct, settings, ensureMediaInZip
         );
 
-        const fieldsStr = finalFieldValues.join("\x1F");
-        const shaBuf = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(fieldsStr));
-        const shaHex = Array.from(new Uint8Array(shaBuf))
-                            .map(b => b.toString(16).padStart(2,"0"))
-                            .join("");
-        const fieldsChecksum = parseInt(shaHex.substring(0,8), 16);
+        var fieldsStr = finalFieldValues.join('\x1F');
+        var shaBuf = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(fieldsStr));
+        var shaHex = Array.from(new Uint8Array(shaBuf))
+                            .map(b => b.toString(16).padStart(2,'0'))
+                            .join('');
+        var fieldsChecksum = parseInt(shaHex.substring(0,8), 16);
 
         try {
-          ankiDb.run("INSERT INTO notes VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
-            card.id, Utils.createUUID(), modelId, card.mod, -1, "",
-            fieldsStr, 0, fieldsChecksum, 0, ""
+          ankiDb.run('INSERT INTO notes VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [
+            card.id, Utils.createUUID(), modelId, card.mod, -1, '',
+            fieldsStr, 0, fieldsChecksum, 0, ''
           ]);
         } catch (err) {
-          console.error("Note insert failed:", err);
-          Utils.setStatus(`Card insert failed: ${err.message}`, "#ef4444");
+          console.error('Note insert failed:', err);
+          Utils.setStatus(`Card insert failed: ${err.message}`, '#ef4444');
           continue;
         }
 
-        const cardTypeNum = card.reviewCount == 0 ? 0 : (card.interval > 1 ? 2 : 1);
-        const cardQueueNum = cardTypeNum;
-        let due = (cardTypeNum > 0) ? (card.due - card.lastReview) : 0;
+        var cardTypeNum = card.reviewCount == 0 ? 0 : (card.interval > 1 ? 2 : 1);
+        var cardQueueNum = cardTypeNum;
+        var due = 0;
 
-        if (cardTypeNum == 1) {
-          const d = new Date();
-          d.setDate(d.getDate() + due);
-          due = Math.floor(d.getTime() / 1000);
+        // Migaku's epoch is Jan 1, 2020, Anki uses Jan 1, 1970
+        // had to calculate this offset to convert between the two
+        var MIGAKU_EPOCH = new Date(2020, 0, 1);
+        var ANKI_EPOCH = new Date(1970, 0, 1);
+        var EPOCH_DIFF_DAYS = Math.floor((MIGAKU_EPOCH.getTime() - ANKI_EPOCH.getTime()) / (24 * 60 * 60 * 1000));
+
+        if(cardTypeNum === 0) {
+          due = 0; // new cards
+        } else if(cardTypeNum === 1) {
+          // learning cards - due is unix timestamp in seconds
+          var migakuDueDays = card.due;
+          var ankiDueDays = migakuDueDays + EPOCH_DIFF_DAYS;
+          due = Math.floor(ankiDueDays * 24 * 60 * 60);
+        } else {
+          // review cards - due is day number since epoch
+          var migakuDueDays = card.due;
+          due = migakuDueDays + EPOCH_DIFF_DAYS;
+
+          if(processed < 3) {
+            var dueDate = new Date(MIGAKU_EPOCH.getTime() + (migakuDueDays * 24 * 60 * 60 * 1000));
+            Utils.log(`Card ${card.id}: migaku due=${migakuDueDays}, anki due=${due}, date=${dueDate.toISOString()}, interval=${card.interval} days`);
+          }
         }
 
-        ankiDb.run("INSERT INTO cards VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+        var roundedInterval = Math.round(card.interval);
+
+        ankiDb.run('INSERT INTO cards VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [
           card.id, card.id, 1, 0, card.mod, -1, cardTypeNum, cardQueueNum, due,
-          Math.floor(card.interval), Math.floor(card.factor * 1000),
-          card.reviewCount, card.failCount, 0, 0, 0, 0, ""
+          roundedInterval, Math.floor(card.factor * 1000),
+          card.reviewCount, card.failCount, 0, 0, 0, 0, ''
         ]);
 
         processed++;
@@ -2912,10 +2952,10 @@ const ExportProcessor = {
       }
     }
 
-    ankiDb.run("COMMIT");
+    ankiDb.run('COMMIT');
 
-    const inverted = Array.from(mediaReverseMap.entries()).map(([sha, idx]) => [idx, sha]);
-    zip.file("media", JSON.stringify(Object.fromEntries(inverted)));
+    var inverted = Array.from(mediaReverseMap.entries()).map(([sha, idx]) => [idx, sha]);
+    zip.file('media', JSON.stringify(Object.fromEntries(inverted)));
 
     Progress.set(100, "Cards converted");
     await Utils.sleep(120);
@@ -2923,45 +2963,87 @@ const ExportProcessor = {
   },
 
   async buildApkgsForSelection(SQL, db, selectedIds, decks, options, mappings) {
-    if (!SQL || !SQL.Database) {
+    if(!SQL || !SQL.Database) {
       throw new Error("SQL.js runtime not provided");
     }
 
-    let allCards = [];
+    var allCards = [];
     for (const id of selectedIds) {
       allCards = allCards.concat(DatabaseOps.listCardsForDeck(db, id).filter(x => !x.del));
     }
 
-    const cardTypes = DatabaseOps.readCardTypes(db);
-    const cardsByType = new Map();
+    var cardTypes = DatabaseOps.readCardTypes(db);
+    var cardsByType = new Map();
     for (const c of allCards) {
       if (!cardsByType.has(c.cardTypeId)) cardsByType.set(c.cardTypeId, []);
       cardsByType.get(c.cardTypeId).push(c);
     }
 
-    const usedCardTypes = Array.from(cardsByType.keys()).map(k => cardTypes.get(k));
+    var usedCardTypes = Array.from(cardsByType.keys()).map(k => cardTypes.get(k));
     if (DeckProtection.checkForbiddenContent(usedCardTypes)) {
-      const msg = DeckProtection.getForbiddenMessage();
+      var msg = DeckProtection.getForbiddenMessage();
       Utils.setStatus(msg, "#ef4444");
       throw new Error(msg);
     }
 
     if (options.mergeSelected) {
-      const mergedName = "Merged - " + selectedIds.map(id =>
+      var mergedName = "Merged - " + selectedIds.map(id =>
         (decks.find(d => String(d.id) === String(id))?.name || id)
       ).join(" + ");
 
       Utils.setStatus(`Building merged APKG: ${mergedName}`);
       Progress.show("Preparing merged package...", 0);
 
-      const mediaDb = await MediaHandler.openLocalMediaCacheDb();
+      var mediaDb = await MediaHandler.openLocalMediaCacheDb();
       if (options.includeMedia && mediaDb) {
         await MediaHandler.gatherMediaFiles(mediaDb, cardsByType, cardTypes, options);
       }
 
-      const zip = new JSZip();
-      const ankiDb = AnkiBuilder.createEmptyAnkiDb(SQL);
-      const reviews = DatabaseOps.listReviewHistory(db).filter(x => !x.del);
+      var zip = new JSZip();
+      var ankiDb = AnkiBuilder.createEmptyAnkiDb(SQL);
+      // Only include reviews for cards being exported
+      var cardIds = new Set(allCards.map(c => c.id));
+
+      // Get reviewHistory days - Migaku only shows stats for days in this table
+      const reviewHistoryDays = new Set();
+      try {
+        const historyRows = DatabaseOps.runQueryToObjects(db, "SELECT day FROM reviewHistory WHERE del = 0");
+        historyRows.forEach(row => reviewHistoryDays.add(row.day));
+        Utils.log(`Found ${reviewHistoryDays.size} days in reviewHistory table`);
+      } catch (e) {
+        Utils.log(`No reviewHistory table or error:`, e);
+      }
+
+      // Filter reviews: only cards in this deck AND days that exist in reviewHistory
+      const reviews = DatabaseOps.listReviewHistory(db).filter(x =>
+        !x.del &&
+        cardIds.has(x.cardId) &&
+        (reviewHistoryDays.size === 0 || reviewHistoryDays.has(x.day))
+      );
+
+      // Debug: Log review counts by type
+      const reviewsByType = { 0: 0, 1: 0, 2: 0 };
+      const reviewsByDay = new Map(); // Track unique cards per day
+      reviews.forEach(r => {
+        reviewsByType[r.type] = (reviewsByType[r.type] || 0) + 1;
+        const dayKey = `${r.day}-${r.type}`;
+        if (!reviewsByDay.has(dayKey)) {
+          reviewsByDay.set(dayKey, new Set());
+        }
+        reviewsByDay.get(dayKey).add(r.cardId);
+      });
+
+      Utils.log(`=== REVIEW DEBUG INFO ===`);
+      Utils.log(`Total review records: ${reviews.length}`);
+      Utils.log(`By type - New(0): ${reviewsByType[0]}, Fail(1): ${reviewsByType[1]}, Pass(2): ${reviewsByType[2]}`);
+
+      // Count unique cards per type across all days (matching Migaku's COUNT DISTINCT)
+      const uniqueCardsByType = { 0: new Set(), 1: new Set(), 2: new Set() };
+      reviews.forEach(r => uniqueCardsByType[r.type].add(`${r.cardId}-${r.day}`));
+      Utils.log(`Unique card-day combinations - New(0): ${uniqueCardsByType[0].size}, Fail(1): ${uniqueCardsByType[1].size}, Pass(2): ${uniqueCardsByType[2].size}`);
+      Utils.log(`^^^ This should match what Migaku shows! ^^^`);
+      Utils.log(`If Migaku shows exactly HALF these numbers, we'll just divide by 2.`);
+
       AnkiBuilder.fillRevlogTable(ankiDb, reviews);
 
       const modelMap = AnkiBuilder.insertCollectionMetadata(ankiDb, usedCardTypes, mappings, options.useTemplates);
@@ -2971,48 +3053,63 @@ const ExportProcessor = {
       zip.file("collection.anki2", exported);
       Progress.set(0, "Zipping .apkg...");
 
-      const blob = await zip.generateAsync({ type: "blob" }, (meta) => {
+      var blob = await zip.generateAsync({ type: "blob" }, (meta) => {
         if (meta && typeof meta.percent === "number") {
           Progress.set(meta.percent, `Zipping – ${Math.round(meta.percent)}%`);
         }
       });
 
-      const name = `Migaku - ${mergedName}.apkg`;
+      var name = `Migaku - ${mergedName}.apkg`;
       ExportProcessor.downloadBlob(blob, name);
       Utils.setStatus("Merged export complete", "#10b981");
       Progress.hide();
     } else {
       for (let i = 0; i < selectedIds.length; i++) {
-        const id = selectedIds[i];
-        const deckInfo = decks.find(d => String(d.id) === String(id));
-        const deckName = deckInfo ? deckInfo.name : `deck-${id}`;
+        var id = selectedIds[i];
+        var deckInfo = decks.find(d => String(d.id) === String(id));
+        var deckName = deckInfo ? deckInfo.name : `deck-${id}`;
 
         Utils.setStatus(`Exporting (${i+1}/${selectedIds.length}) – ${deckName} ...`, "#f59e0b");
         Progress.show(`Preparing ${deckName}`, 0);
 
-        const cards = DatabaseOps.listCardsForDeck(db, id).filter(x => !x.del);
-        const cardsByTypeIndividual = new Map();
+      var allCards = DatabaseOps.listCardsForDeck(db, id).filter(x => !x.del);
+      var cardsByTypeIndividual = new Map();
 
-        for (const c of cards) {
-          if (!cardsByTypeIndividual.has(c.cardTypeId)) cardsByTypeIndividual.set(c.cardTypeId, []);
-          cardsByTypeIndividual.get(c.cardTypeId).push(c);
-        }
-
-        const individualCardTypes = Array.from(cardsByTypeIndividual.keys()).map(k => cardTypes.get(k));
+      for (const c of allCards) {
+        if(!cardsByTypeIndividual.has(c.cardTypeId)) cardsByTypeIndividual.set(c.cardTypeId, []);
+        cardsByTypeIndividual.get(c.cardTypeId).push(c);
+      }        var individualCardTypes = Array.from(cardsByTypeIndividual.keys()).map(k => cardTypes.get(k));
         if (DeckProtection.checkForbiddenContent(individualCardTypes)) {
-          const msg = DeckProtection.getForbiddenMessage();
+          var msg = DeckProtection.getForbiddenMessage();
           Utils.setStatus(msg, "#ef4444");
           throw new Error(msg);
         }
 
-        const mediaDb = await MediaHandler.openLocalMediaCacheDb();
+        var mediaDb = await MediaHandler.openLocalMediaCacheDb();
         if (options.includeMedia && mediaDb) {
           await MediaHandler.gatherMediaFiles(mediaDb, cardsByTypeIndividual, cardTypes, options);
         }
 
-        const zip = new JSZip();
-        const ankiDb = AnkiBuilder.createEmptyAnkiDb(SQL);
-        const reviews = DatabaseOps.listReviewHistory(db).filter(x => !x.del);
+        var zip = new JSZip();
+        var ankiDb = AnkiBuilder.createEmptyAnkiDb(SQL);
+        // Only include reviews for cards being exported
+        var cardIds = new Set(allCards.map(c => c.id));
+
+        // Get reviewHistory days
+        var reviewHistoryDays = new Set();
+        try {
+          var historyRows = DatabaseOps.runQueryToObjects(db, "SELECT day FROM reviewHistory WHERE del = 0");
+          historyRows.forEach(row => reviewHistoryDays.add(row.day));
+        } catch (e) {
+          // reviewHistory table might not exist
+        }
+
+        // Filter reviews to only cards in this deck AND days in reviewHistory
+        const reviews = DatabaseOps.listReviewHistory(db).filter(x =>
+          !x.del &&
+          cardIds.has(x.cardId) &&
+          (reviewHistoryDays.size === 0 || reviewHistoryDays.has(x.day))
+        );
         AnkiBuilder.fillRevlogTable(ankiDb, reviews);
 
         const modelMap = AnkiBuilder.insertCollectionMetadata(ankiDb, individualCardTypes, mappings, options.useTemplates);
@@ -3054,7 +3151,20 @@ const ExportProcessor = {
   async exportWordlists(db, language) {
     try {
       Utils.setStatus("Preparing wordlists...");
-      const wl = DatabaseOps.listWordListForLanguage(db, language);
+
+      // If no language specified, get all word lists
+      let wl;
+      if (!language) {
+        Utils.log("No language specified, getting all word lists");
+        wl = DatabaseOps.runQueryToObjects(db,
+          "SELECT dictForm, secondary, partOfSpeech, language, mod, serverMod, del, knownStatus, hasCard, tracked FROM WordList"
+        );
+      } else {
+        wl = DatabaseOps.listWordListForLanguage(db, language);
+      }
+
+      Utils.log(`Found ${wl.length} words in wordlist`);
+
       const unknown = [], ignored = [], learning = [], known = [], tracked = [];
 
       for (const w of wl) {
@@ -3068,6 +3178,8 @@ const ExportProcessor = {
         }
         if (w.tracked) tracked.push(w);
       }
+
+      Utils.log(`Wordlist counts - Unknown: ${unknown.length}, Ignored: ${ignored.length}, Learning: ${learning.length}, Known: ${known.length}, Tracked: ${tracked.length}`);
 
       const q = (s) => `"${(s || "").replaceAll('"','""')}"`;
       const toCsv = (arr) => {
@@ -3101,8 +3213,7 @@ const ExportProcessor = {
   }
 };
 
-// MAIN UI CREATION
-
+// UI setup - all the CSS and modal stuff
 const UI = {
   injectStyles: () => {
     if (document.getElementById("mgkexporterStyles")) return;
@@ -4341,8 +4452,7 @@ const UI = {
   }
 };
 
-// MAIN INITIALIZATION
-
+// Main init function
 let globalSqlDbHandle = null;
 
 async function initializeMigakuExporter() {
@@ -4376,7 +4486,7 @@ async function initializeMigakuExporter() {
 
     window._mgkSqlJs = SQL;
 
-
+    // load the main database
     const raw = await DatabaseOps.loadRawSrsDatabaseBlob();
     if (!raw) {
       Utils.setStatus("Unable to open Migaku DB (srs). Make sure the site is loaded.", "#ef4444");
@@ -4386,16 +4496,16 @@ async function initializeMigakuExporter() {
     globalSqlDbHandle = new SQL.Database(raw);
     window._mgkSqlDbHandle = globalSqlDbHandle;
 
-
+    // create UI
     UI.createMainUI();
     MigakuGPT.init();
 
-
+    // populate deck list
     const decks = DatabaseOps.listDecks(globalSqlDbHandle);
     const lang = Utils.safeGetElement("main.MIGAKU-SRS")?.getAttribute?.("data-mgk-lang-selected") || null;
     UI.populateDeckListAndWire(decks, lang);
 
-
+    // default export settings
     const settings = {
       simpleMode: true,
       includeImages: true,
@@ -4496,7 +4606,7 @@ async function initializeMigakuExporter() {
         };
       }
 
-
+      // save settings to localStorage
       Storage.saveSettings({
         simpleMode: simple,
         includeImages: opts.includeImages,
@@ -4536,7 +4646,18 @@ async function initializeMigakuExporter() {
     });
 
     Utils.safeAddListener(Utils.safeGetElement("mgkExportWordlistBtn"), "click", async () => {
-      const useLang = lang || Utils.safeGetElement("main.MIGAKU-SRS")?.getAttribute?.("data-mgk-lang-selected") || null;
+      let useLang = lang || Utils.safeGetElement("main.MIGAKU-SRS")?.getAttribute?.("data-mgk-lang-selected") || null;
+
+      // If still no language, try to get it from the decks
+      if (!useLang && globalSqlDbHandle) {
+        const decks = DatabaseOps.listDecks(globalSqlDbHandle);
+        const activeDeck = decks.find(d => !d.del && d.lang);
+        if (activeDeck) {
+          useLang = activeDeck.lang;
+          Utils.log(`Using language from deck: ${useLang}`);
+        }
+      }
+
       Utils.setStatus("Exporting wordlists...", "#f59e0b");
       await ExportProcessor.exportWordlists(globalSqlDbHandle, useLang);
     });
@@ -4552,7 +4673,7 @@ async function initializeMigakuExporter() {
 }
 
 
-// ERROR HANDLING & RECOVERY
+// global error handling
 
 
 window.addEventListener('error', (event) => {
@@ -4565,7 +4686,7 @@ window.addEventListener('unhandledrejection', (event) => {
   Utils.setStatus("Promise rejection - check console", "#ef4444");
 });
 
-
+// debug stuff - expose on window so I can mess with it in console
 window.migakuExporterV3 = {
   Utils,
   Storage,
@@ -4587,8 +4708,7 @@ window.migakuExporterV3 = {
 
 window.MigakuGPT = MigakuGPT;
 
-// INITIALIZATION
-
+// startup + recovery logic (in case migaku's page loads weird)
 (function robustMigakuLauncher() {
 
   window.addEventListener('error', (event) => {
@@ -4608,11 +4728,11 @@ window.MigakuGPT = MigakuGPT;
       console.error("[MGK] Initialization failed:", err);
       Utils.setStatus("Initialization failed - attempting recovery...", "#ef4444");
 
+      // Try to recover by checking if UI exists and recreating if needed
       const recoveryInterval = setInterval(() => {
         recoveryAttempts++;
 
         try {
-
           if (!Utils.safeGetElement(CONFIG.FAB_ID)) {
             try {
               UI.createMainUI();
