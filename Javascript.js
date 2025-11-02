@@ -658,11 +658,11 @@ const AnkiBuilder = {
   fillRevlogTable(db, reviews) {
     var revIntervals = new Map();
     reviews.sort((a,b) => a.mod - b.mod);
-
+    
     // migaku counts distinct cardId per day/type, so dedupe
     var uniqueKey = new Set();
     var uniqueReviews = [];
-
+    
     for (var i = 0; i < reviews.length; i++) {
       var r = reviews[i];
       var key = `${r.cardId}-${r.day}-${r.type}`;
@@ -671,14 +671,14 @@ const AnkiBuilder = {
         uniqueReviews.push(r);
       }
     }
-
+    
     Utils.log(`fillRevlogTable: ${reviews.length} reviews → ${uniqueReviews.length} unique`);
     var insertedByType = { 0: 0, 1: 0, 2: 0 };
-
+    
     // make sure review IDs are unique
     var usedReviewIds = new Set();
     var reviewIdCounter = 0;
-
+    
     db.run("BEGIN TRANSACTION;");
 
     for (const r of uniqueReviews) {
@@ -690,16 +690,16 @@ const AnkiBuilder = {
       insertedByType[r.type] = (insertedByType[r.type] || 0) + 1;
 
       var prevIvl = revIntervals.has(r.cardId) ? revIntervals.get(r.cardId) : 0;
-
+      
       var reviewId = r.mod;
       while (usedReviewIds.has(reviewId)) {
         reviewId++;
         reviewIdCounter++;
       }
       usedReviewIds.add(reviewId);
-
+      
       const currentInterval = Math.round(r.interval);
-
+      
       db.run("INSERT INTO revlog VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", [
         reviewId, r.cardId, -1, ease, currentInterval, prevIvl,
         Math.floor(r.factor * 1000), Math.min(r.duration, 60) * 1000,
@@ -708,7 +708,7 @@ const AnkiBuilder = {
       revIntervals.set(r.cardId, currentInterval);
     }
     db.run("COMMIT");
-
+    
     if (reviewIdCounter > 0) {
       Utils.log(`Fixed ${reviewIdCounter} duplicate review IDs`);
     }
@@ -2910,31 +2910,31 @@ const ExportProcessor = {
           continue;
         }
 
-        var cardTypeNum = card.reviewCount == 0 ? 0 : (card.interval > 1 ? 2 : 1);
+        // Migaku doesn't have separate learning queues like Anki
+        // All reviewed cards are just "review" cards with different intervals
+        var cardTypeNum = card.reviewCount == 0 ? 0 : 2;
         var cardQueueNum = cardTypeNum;
         var due = 0;
-
-        // Migaku's epoch is Jan 1, 2020, Anki uses Jan 1, 1970
-        // had to calculate this offset to convert between the two
+        
+        // Migaku's epoch is Jan 1, 2020, Anki uses days relative to collection creation
         var MIGAKU_EPOCH = new Date(2020, 0, 1);
-        var ANKI_EPOCH = new Date(1970, 0, 1);
-        var EPOCH_DIFF_DAYS = Math.floor((MIGAKU_EPOCH.getTime() - ANKI_EPOCH.getTime()) / (24 * 60 * 60 * 1000));
-
+        var NOW = new Date();
+        
         if(cardTypeNum === 0) {
-          due = 0; // new cards
-        } else if(cardTypeNum === 1) {
-          // learning cards - due is unix timestamp in seconds
-          var migakuDueDays = card.due;
-          var ankiDueDays = migakuDueDays + EPOCH_DIFF_DAYS;
-          due = Math.floor(ankiDueDays * 24 * 60 * 60);
+          // new cards - due is position in new queue
+          due = card.due || 0;
         } else {
-          // review cards - due is day number since epoch
+          // review cards - due is days from NOW (collection creation time)
+          // Migaku stores due as days since Jan 1, 2020
           var migakuDueDays = card.due;
-          due = migakuDueDays + EPOCH_DIFF_DAYS;
-
+          var dueDate = new Date(MIGAKU_EPOCH.getTime() + (migakuDueDays * 24 * 60 * 60 * 1000));
+          
+          // calculate days between now and the due date
+          var daysFromNow = Math.round((dueDate.getTime() - NOW.getTime()) / (24 * 60 * 60 * 1000));
+          due = daysFromNow;
+          
           if(processed < 3) {
-            var dueDate = new Date(MIGAKU_EPOCH.getTime() + (migakuDueDays * 24 * 60 * 60 * 1000));
-            Utils.log(`Card ${card.id}: migaku due=${migakuDueDays}, anki due=${due}, date=${dueDate.toISOString()}, interval=${card.interval} days`);
+            Utils.log(`Card ${card.id}: migaku due=${migakuDueDays} days since 2020, actual date=${dueDate.toISOString()}, days from now=${daysFromNow}, interval=${card.interval}`);
           }
         }
 
@@ -3003,7 +3003,7 @@ const ExportProcessor = {
       var ankiDb = AnkiBuilder.createEmptyAnkiDb(SQL);
       // Only include reviews for cards being exported
       var cardIds = new Set(allCards.map(c => c.id));
-
+      
       // Get reviewHistory days - Migaku only shows stats for days in this table
       const reviewHistoryDays = new Set();
       try {
@@ -3013,14 +3013,14 @@ const ExportProcessor = {
       } catch (e) {
         Utils.log(`No reviewHistory table or error:`, e);
       }
-
+      
       // Filter reviews: only cards in this deck AND days that exist in reviewHistory
-      const reviews = DatabaseOps.listReviewHistory(db).filter(x =>
-        !x.del &&
-        cardIds.has(x.cardId) &&
+      const reviews = DatabaseOps.listReviewHistory(db).filter(x => 
+        !x.del && 
+        cardIds.has(x.cardId) && 
         (reviewHistoryDays.size === 0 || reviewHistoryDays.has(x.day))
       );
-
+      
       // Debug: Log review counts by type
       const reviewsByType = { 0: 0, 1: 0, 2: 0 };
       const reviewsByDay = new Map(); // Track unique cards per day
@@ -3032,18 +3032,18 @@ const ExportProcessor = {
         }
         reviewsByDay.get(dayKey).add(r.cardId);
       });
-
+      
       Utils.log(`=== REVIEW DEBUG INFO ===`);
       Utils.log(`Total review records: ${reviews.length}`);
       Utils.log(`By type - New(0): ${reviewsByType[0]}, Fail(1): ${reviewsByType[1]}, Pass(2): ${reviewsByType[2]}`);
-
+      
       // Count unique cards per type across all days (matching Migaku's COUNT DISTINCT)
       const uniqueCardsByType = { 0: new Set(), 1: new Set(), 2: new Set() };
       reviews.forEach(r => uniqueCardsByType[r.type].add(`${r.cardId}-${r.day}`));
       Utils.log(`Unique card-day combinations - New(0): ${uniqueCardsByType[0].size}, Fail(1): ${uniqueCardsByType[1].size}, Pass(2): ${uniqueCardsByType[2].size}`);
       Utils.log(`^^^ This should match what Migaku shows! ^^^`);
       Utils.log(`If Migaku shows exactly HALF these numbers, we'll just divide by 2.`);
-
+      
       AnkiBuilder.fillRevlogTable(ankiDb, reviews);
 
       const modelMap = AnkiBuilder.insertCollectionMetadata(ankiDb, usedCardTypes, mappings, options.useTemplates);
@@ -3094,7 +3094,7 @@ const ExportProcessor = {
         var ankiDb = AnkiBuilder.createEmptyAnkiDb(SQL);
         // Only include reviews for cards being exported
         var cardIds = new Set(allCards.map(c => c.id));
-
+        
         // Get reviewHistory days
         var reviewHistoryDays = new Set();
         try {
@@ -3103,11 +3103,11 @@ const ExportProcessor = {
         } catch (e) {
           // reviewHistory table might not exist
         }
-
+        
         // Filter reviews to only cards in this deck AND days in reviewHistory
-        const reviews = DatabaseOps.listReviewHistory(db).filter(x =>
-          !x.del &&
-          cardIds.has(x.cardId) &&
+        const reviews = DatabaseOps.listReviewHistory(db).filter(x => 
+          !x.del && 
+          cardIds.has(x.cardId) && 
           (reviewHistoryDays.size === 0 || reviewHistoryDays.has(x.day))
         );
         AnkiBuilder.fillRevlogTable(ankiDb, reviews);
@@ -3151,7 +3151,7 @@ const ExportProcessor = {
   async exportWordlists(db, language) {
     try {
       Utils.setStatus("Preparing wordlists...");
-
+      
       // If no language specified, get all word lists
       let wl;
       if (!language) {
@@ -3162,9 +3162,9 @@ const ExportProcessor = {
       } else {
         wl = DatabaseOps.listWordListForLanguage(db, language);
       }
-
+      
       Utils.log(`Found ${wl.length} words in wordlist`);
-
+      
       const unknown = [], ignored = [], learning = [], known = [], tracked = [];
 
       for (const w of wl) {
@@ -3917,6 +3917,11 @@ const UI = {
   },
 
   createMainUI: () => {
+    // Check if UI already exists
+    if (Utils.safeGetElement(CONFIG.FAB_ID)) {
+      return;
+    }
+    
     UI.injectStyles();
     MappingModal.create();
 
@@ -4449,8 +4454,55 @@ const UI = {
         updateBadgeAndHidden();
       }
     };
+  },
+
+  destroyUI: () => {
+    const fab = Utils.safeGetElement(CONFIG.FAB_ID);
+    const fabMenu = Utils.safeGetElement("mgkFabMenu");
+    
+    if (fab && fab.parentNode) {
+      fab.parentNode.removeChild(fab);
+    }
+    if (fabMenu && fabMenu.parentNode) {
+      fabMenu.parentNode.removeChild(fabMenu);
+    }
   }
 };
+
+// Route monitoring (copied from stats.js pattern)
+function handleRouteChange() {
+  const isRootPath = window.location.pathname === '/' || window.location.pathname === '';
+  
+  if (isRootPath) {
+    UI.createMainUI();
+  } else {
+    UI.destroyUI();
+  }
+}
+
+function monkeyPatchHistoryMethods() {
+  const originalPushState = history.pushState;
+  const originalReplaceState = history.replaceState;
+  
+  history.pushState = function(...args) {
+    const ret = originalPushState.apply(this, args);
+    window.dispatchEvent(new Event("locationchange"));
+    return ret;
+  };
+  
+  history.replaceState = function(...args) {
+    const ret = originalReplaceState.apply(this, args);
+    window.dispatchEvent(new Event("locationchange"));
+    return ret;
+  };
+}
+
+function setupRouteListener() {
+  monkeyPatchHistoryMethods();
+  window.addEventListener("popstate", handleRouteChange);
+  window.addEventListener("locationchange", handleRouteChange);
+  window.addEventListener("hashchange", handleRouteChange);
+}
 
 // Main init function
 let globalSqlDbHandle = null;
@@ -4496,8 +4548,10 @@ async function initializeMigakuExporter() {
     globalSqlDbHandle = new SQL.Database(raw);
     window._mgkSqlDbHandle = globalSqlDbHandle;
 
-    // create UI
-    UI.createMainUI();
+    // Setup route monitoring
+    setupRouteListener();
+    handleRouteChange();
+    
     MigakuGPT.init();
 
     // populate deck list
@@ -4647,7 +4701,7 @@ async function initializeMigakuExporter() {
 
     Utils.safeAddListener(Utils.safeGetElement("mgkExportWordlistBtn"), "click", async () => {
       let useLang = lang || Utils.safeGetElement("main.MIGAKU-SRS")?.getAttribute?.("data-mgk-lang-selected") || null;
-
+      
       // If still no language, try to get it from the decks
       if (!useLang && globalSqlDbHandle) {
         const decks = DatabaseOps.listDecks(globalSqlDbHandle);
@@ -4657,7 +4711,7 @@ async function initializeMigakuExporter() {
           Utils.log(`Using language from deck: ${useLang}`);
         }
       }
-
+      
       Utils.setStatus("Exporting wordlists...", "#f59e0b");
       await ExportProcessor.exportWordlists(globalSqlDbHandle, useLang);
     });
