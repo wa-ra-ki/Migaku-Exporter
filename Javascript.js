@@ -27,7 +27,7 @@ const CONFIG = {
 
   MIGAKU_FIELDS: [
     'Word', 'Sentence', 'Translated Sentence', 'Definitions',
-    'Example Sentences', 'Notes', 'Images', 'Word Audio', 'Sentence Audio'
+    'Example Sentences', 'Notes', 'Images', 'Sentence Audio', 'Word Audio'
   ],
 
   FORBIDDEN_PATTERNS: /\b(migaku|academy|fundamentals|course|lesson)\b/i,
@@ -4829,4 +4829,3 @@ window.MigakuGPT = MigakuGPT;
   tryInitialization();
 
 })();
-
