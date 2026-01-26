@@ -70,7 +70,12 @@ const Utils = {
 
   safeGetElement: (id) => {
     try {
-      return document.getElementById(id);
+      const element =  document.getElementById(id);
+      if(element === null) {
+        console.warn(`[MGK] Element not found: ${id}`);
+        return null;
+      }
+      return element;
     } catch (error) {
       console.warn(`[MGK] Element not found: ${id}`);
       return null;
@@ -4568,7 +4573,7 @@ async function initializeMigakuExporter() {
 
     // populate deck list
     const decks = DatabaseOps.listDecks(globalSqlDbHandle);
-    const lang = Utils.safeGetElement("main.MIGAKU-SRS")?.getAttribute?.("data-mgk-lang-selected") || null;
+    const lang = document.querySelector("main.MIGAKU-SRS")?.getAttribute?.("data-mgk-lang-selected") || null;
     UI.populateDeckListAndWire(decks, lang);
 
     // default export settings
@@ -4712,7 +4717,7 @@ async function initializeMigakuExporter() {
     });
 
     Utils.safeAddListener(Utils.safeGetElement("mgkExportWordlistBtn"), "click", async () => {
-      let useLang = lang || Utils.safeGetElement("main.MIGAKU-SRS")?.getAttribute?.("data-mgk-lang-selected") || null;
+      let useLang = lang || document.querySelector("main.MIGAKU-SRS")?.getAttribute?.("data-mgk-lang-selected") || null;
 
       // If still no language, try to get it from the decks
       if (!useLang && globalSqlDbHandle) {
