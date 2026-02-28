@@ -3979,6 +3979,15 @@ const UI = {
     Utils.safeAddListener(fab, "click", () => {
       const isVisible = fabMenu.style.display === "flex";
       fabMenu.style.display = isVisible ? "none" : "flex";
+      const languageDropdown = Utils.safeGetElement("mgkLanguageFilter");
+      if (languageDropdown) {
+        const children = languageDropdown.children;
+        for(let i = 0; i < children.length; i++) {
+          const option = children[i];
+          option.selected = option.value === document.querySelector("main.MIGAKU-SRS")?.getAttribute?.("data-mgk-lang-selected");
+        }
+        languageDropdown.dispatchEvent(new Event("change"));
+      }
     });
 
     Utils.safeAddListener(Utils.safeGetElement("mgkComingSoon"), "click", () => {
@@ -4039,6 +4048,9 @@ const UI = {
       <div class="mgk-controls">
         <div class="mgk-row">
           <div style="flex:1; position:relative;">
+            <select id="mgkLanguageFilter" class="mgk-language-select" style="margin-bottom: 12px; width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--secondary-bg); color: var(--text); font-size: 14px; cursor: pointer;">
+              <option value="">All Languages</option>
+            </select>
             <div class="mgk-search">
               <input id="mgkDeckSearch" placeholder="Search decks…">
             </div>
@@ -4300,6 +4312,7 @@ const UI = {
   populateDeckListAndWire: (decks, currentLanguage) => {
     const listEl = Utils.safeGetElement("mgkDeckList");
     const searchEl = Utils.safeGetElement("mgkDeckSearch");
+    const languageFilterEl = Utils.safeGetElement("mgkLanguageFilter");
     const hidden = Utils.safeGetElement("mgkDeckSelectHidden");
     const badge = Utils.safeGetElement("mgkSelectedBadge");
     if (!listEl || !searchEl || !badge) return;
@@ -4310,6 +4323,18 @@ const UI = {
       lang: d.lang
     }));
     let selected = new Set();
+    // Populate language dropdown
+    if (languageFilterEl) {
+      const languages = [...new Set(items.map(d => d.lang).filter(Boolean))].sort();
+      languageFilterEl.innerHTML = '<option value="">All Languages</option>';
+      languages.forEach(lang => {
+        const option = document.createElement('option');
+        option.value = lang;
+        option.textContent = lang;
+        if (lang === currentLanguage) option.selected = true;
+        languageFilterEl.appendChild(option);
+      });
+    }
 
     function updateBadgeAndHidden() {
       if (selected.size === 0) {
@@ -4325,9 +4350,15 @@ const UI = {
     }
 
     function render(filter = "") {
+      const languageFilter = Utils.safeGetElement("mgkLanguageFilter")?.value || null;
       listEl.innerHTML = "";
       const q = (filter || "").toLowerCase().trim();
-      const filtered = items.filter(it => it.name.toLowerCase().includes(q));
+      let filtered = items.filter(it => it.name.toLowerCase().includes(q));
+
+      // Apply language filter
+      if (languageFilter) {
+        filtered = filtered.filter(it => it.lang === languageFilter);
+      }
 
       if (filtered.length === 0) {
         listEl.innerHTML = `<div class="mgk-small" style="padding:16px;color:var(--text-muted);text-align:center;">No decks found</div>`;
@@ -4451,6 +4482,14 @@ const UI = {
       };
     }
 
+    // Language filter change listener
+    if (languageFilterEl) {
+      Utils.safeAddListener(languageFilterEl, "change", () => {
+        const searchFilter = searchEl?.value || "";
+        render(searchFilter);
+      });
+    }
+
     document.addEventListener("click", (e) => {
       const root = Utils.safeGetElement("mgkDeckList")?.parentElement;
       if (!root) return;
@@ -4530,7 +4569,8 @@ async function initializeMigakuExporter() {
 
     await new Promise((resolve) => {
       const checkForApp = () => {
-        if (document.querySelector(".HomeDecks") || document.querySelector("main.MIGAKU-SRS")) {
+        // he needs to wait until one language is selected to check if the app is fully loaded
+        if (document.querySelector("main.MIGAKU-SRS")?.getAttribute?.("data-mgk-lang-selected")) {
           resolve();
         } else {
           setTimeout(checkForApp, 500);
@@ -4717,7 +4757,14 @@ async function initializeMigakuExporter() {
     });
 
     Utils.safeAddListener(Utils.safeGetElement("mgkExportWordlistBtn"), "click", async () => {
-      let useLang = lang || document.querySelector("main.MIGAKU-SRS")?.getAttribute?.("data-mgk-lang-selected") || null;
+      // First check language filter dropdown
+      const languageFilterEl = Utils.safeGetElement("mgkLanguageFilter");
+      let useLang = languageFilterEl?.value || null;
+
+      // Fall back to passed lang parameter or Migaku's selected language
+      if (!useLang) {
+        useLang = lang || document.querySelector("main.MIGAKU-SRS")?.getAttribute?.("data-mgk-lang-selected") || null;
+      }
 
       // If still no language, try to get it from the decks
       if (!useLang && globalSqlDbHandle) {
