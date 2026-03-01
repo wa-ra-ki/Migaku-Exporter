@@ -1,16 +1,22 @@
 // ==UserScript==
 // @name        Migaku deck exporter V2
-// @namespace   Violentmonkey Scripts
+// @namespace   http://tampermonkey.net/
 // @match       https://study.migaku.com/*
 // @grant       GM_getResourceURL
 // @run-at      document-idle
-// @version     2
+// @version     2.1
 // @author      waraki (Forked From SirOlaf)
 // @description Migaku → Anki exporter with MigakuGPT
 // @require     data:application/javascript,%3BglobalThis.setImmediate%3DsetTimeout%3B
 // @require     https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.13.0/sql-wasm.js
 // @resource    sql_wasm https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.13.0/sql-wasm.wasm
 // @require     https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js
+// @homepageURL https://github.com/wa-ra-ki/Migaku-Exporter
+// @supportURL  https://github.com/wa-ra-ki/Migaku-Exporter/issues
+// @connect     github.com
+// @connect     raw.githubusercontent.com
+// @downloadURL https://raw.githubusercontent.com/wa-ra-ki/Migaku-Exporter/main/Javascript.js
+// @updateURL   https://raw.githubusercontent.com/wa-ra-ki/Migaku-Exporter/main/Javascript.js
 // ==/UserScript==
 
 const CONFIG = {
