@@ -491,8 +491,6 @@ const FieldMapper = {
 
     return processedFields;
   },
-
-  getExpectedFieldCount: () => FieldMapper.getFieldNames().length
 };
 
 // protect against exporting academy courses (migaku doesn't want these redistributed)
