@@ -9,7 +9,6 @@
 // @description Migaku → Anki exporter with MigakuGPT
 // @require     data:application/javascript,%3BglobalThis.setImmediate%3DsetTimeout%3B
 // @require     https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.13.0/sql-wasm.js
-// @resource    sql_wasm https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.13.0/sql-wasm.wasm
 // @require     https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js
 // @homepageURL https://github.com/wa-ra-ki/Migaku-Exporter
 // @supportURL  https://github.com/wa-ra-ki/Migaku-Exporter/issues
@@ -257,17 +256,6 @@ const MediaProcessor = {
       img.src = URL.createObjectURL(imgBlob);
     });
   },
-
-  async decodeAudioBlobToBuffer(blob) {
-    try {
-      var arrayBuffer = await blob.arrayBuffer();
-      var ctx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 1, 44100);
-      return await ctx.decodeAudioData(arrayBuffer);
-    } catch (e) {
-      console.warn("Audio decode failed", e);
-      throw e;
-    }
-  }
 };
 
 // firebase auth to get media from migaku's servers
@@ -4586,18 +4574,9 @@ async function initializeMigakuExporter() {
     });
 
     let SQL;
-    try {
-      const wasmUrl = GM_getResourceURL("sql_wasm");
-      const resp = await fetch(wasmUrl);
-      if (!resp.ok) throw new Error("Failed to fetch sql-wasm resource: " + resp.status);
-      const wasmBinary = await resp.arrayBuffer();
-      SQL = await initSqlJs({ wasmBinary });
-    } catch (e) {
-      console.warn("WASM init with wasmBinary failed, falling back", e);
-      SQL = await initSqlJs({
-        locateFile: () => GM_getResourceURL("sql_wasm")
-      });
-    }
+    SQL = await initSqlJs({
+      locateFile: () => 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.13.0/sql-wasm.wasm'
+    });
 
     window._mgkSqlJs = SQL;
 
