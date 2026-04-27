@@ -6,7 +6,7 @@
 // @run-at      document-idle
 // @version     2.1
 // @author      waraki (Forked From SirOlaf)
-// @description Migaku → Anki exporter with MigakuGPT
+// @description Migaku → Anki exporter
 // @require     data:application/javascript,%3BglobalThis.setImmediate%3DsetTimeout%3B
 // @require     https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.13.0/sql-wasm.js
 // @require     https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js
@@ -467,19 +467,40 @@ const FieldMapper = {
     ];
 
     var fieldNames = FieldMapper.getFieldNames();
+    var defFields = (cardType && cardType.config && Array.isArray(cardType.config.fields))
+      ? cardType.config.fields
+      : [];
     var processedFields = [];
 
     for(let i = 0; i < fieldNames.length; i++) {
       var fieldName = fieldNames[i];
       var rawValue = rawFields[i] || "";
-      var lowerName = fieldName.toLowerCase();
+      var defType = String(defFields[i]?.type || "").toUpperCase();
+      var isImageField = defType === "IMAGE";
+      var isAudioField = defType === "AUDIO" || defType === "AUDIO_LONG";
 
-      if(lowerName.includes("image") && settings.includeImages && rawValue) {
-        var mediaName = await ensureMediaInZip(rawValue);
-        processedFields.push(mediaName ? `<img src="${mediaName}">` : "");
-      } else if(lowerName.includes("audio") && settings.includeAudio && rawValue) {
-        var mediaName = await ensureMediaInZip(rawValue);
-        processedFields.push(mediaName ? `[sound:${mediaName}]` : "");
+      if(isImageField && settings.includeImages && rawValue) {
+        var imageRefs = MediaHandler.extractMediaPaths(rawValue);
+        if(imageRefs.length === 0) imageRefs = [rawValue];
+
+        var imageTags = [];
+        for(const ref of imageRefs) {
+          var mediaName = await ensureMediaInZip(ref);
+          if(mediaName) imageTags.push(`<img src="${mediaName}">`);
+        }
+
+        processedFields.push(imageTags.join("<br>"));
+      } else if(isAudioField && settings.includeAudio && rawValue) {
+        var audioRefs = MediaHandler.extractMediaPaths(rawValue);
+        if(audioRefs.length === 0) audioRefs = [rawValue];
+
+        var soundTags = [];
+        for(const ref of audioRefs) {
+          var mediaName = await ensureMediaInZip(ref);
+          if(mediaName) soundTags.push(`[sound:${mediaName}]`);
+        }
+
+        processedFields.push(soundTags.join(" "));
       } else {
         if(!settings.keepSyntax && rawValue) {
           // strip out migaku's bracket syntax
@@ -2640,6 +2661,85 @@ renderGlobalMapping: () => {
 
 // media download and caching
 const MediaHandler = {
+  normalizeMediaPath(raw) {
+    if (!raw || typeof raw !== "string") return null;
+    var value = raw.trim();
+    if (!value) return null;
+
+    if (value.startsWith("[sound:") && value.endsWith("]")) {
+      value = value.slice(7, -1).trim();
+    }
+
+    if (value.startsWith("src=")) {
+      value = value.replace(/^src\s*=\s*/i, "").replace(/^['\"]|['\"]$/g, "");
+    }
+
+    if (value.startsWith("data:")) value = value.slice(5);
+
+    if (value.startsWith("r2://")) value = value.slice(5);
+
+    value = value.replace(/^['\"]|['\"]$/g, "").trim();
+    if (!value) return null;
+
+    var queryIdx = value.indexOf("?");
+    if (queryIdx >= 0) value = value.slice(0, queryIdx);
+
+    return value || null;
+  },
+
+  extractMediaPaths(value) {
+    if (!value || typeof value !== "string") return [];
+
+    const out = [];
+    const seen = new Set();
+
+    const addPath = (candidate) => {
+      var normalized = MediaHandler.normalizeMediaPath(candidate);
+      if (!normalized || seen.has(normalized)) return;
+      seen.add(normalized);
+      out.push(normalized);
+    };
+
+    value.replace(/\[sound:([^\]]+)\]/gi, (_, p1) => {
+      addPath(p1);
+      return _;
+    });
+
+    value.replace(/src\s*=\s*["']([^"']+)["']/gi, (_, p1) => {
+      addPath(p1);
+      return _;
+    });
+
+    value.replace(/\bdata:[^\s<>'"\]\)]+/gi, (match) => {
+      addPath(match);
+      return match;
+    });
+
+    if (out.length === 0) {
+      const trimmed = value.trim();
+      // Migaku stores multiple images pipe-separated — always split on | first
+      const segments = trimmed.split("|").map(s => s.trim()).filter(Boolean);
+      for (const seg of segments) {
+        if (seg.startsWith("r2://") || seg.startsWith("/") || seg.startsWith("data:") ||
+            /\.(jpe?g|png|gif|webp|svg|mp3|m4a|ogg|wav|aac|opus)(\?|$)/i.test(seg)) {
+          addPath(seg);
+        } else {
+          // No pipe — try splitting on other non-space delimiters only
+          for (const token of seg.split(/[\n\r\t,;]+/)) {
+            const t = token.trim();
+            if (!t) continue;
+            if (t.startsWith("data:") || t.startsWith("/") || t.startsWith("r2://") ||
+                /\.(jpe?g|png|gif|webp|svg|mp3|m4a|ogg|wav|aac|opus)(\?|$)/i.test(t)) {
+              addPath(t);
+            }
+          }
+        }
+      }
+    }
+
+    return out;
+  },
+
   async fetchRemoteMediaBlob(path, auth) {
     if (!auth) auth = await FirebaseAuth.getAccessToken().catch(() => null);
     if (auth && auth.expiresAt < Date.now()) {
@@ -2649,17 +2749,18 @@ const MediaHandler = {
     }
 
     const base = "https://file-sync-worker-api.migaku.com/data/";
-    const url = base + path;
+    // encode each path segment individually (preserve slashes)
+    const encodedPath = path.split("/").map(seg => encodeURIComponent(decodeURIComponent(seg))).join("/");
+    const url = base + encodedPath;
 
     try {
       const resp = await fetch(url, {
         headers: { Authorization: "Bearer " + (auth?.token || "") },
         cache: "force-cache"
       });
-      if (resp.status !== 200) return null;
+      if (resp.status !== 200) return null;  // 404/500 etc — skip silently
       return await resp.blob();
     } catch (e) {
-      console.warn("Failed to fetch media:", path, e);
       return null;
     }
   },
@@ -2718,6 +2819,8 @@ const MediaHandler = {
     Utils.setStatus("Preparing media list...");
     const pathSet = new Set();
 
+    const fieldNames = FieldMapper.getFieldNames();
+
     for (const typeKey of cardsByType.keys()) {
       const list = cardsByType.get(typeKey);
       const ct = cardTypes.get(typeKey);
@@ -2725,23 +2828,30 @@ const MediaHandler = {
         ct.config.fields : [{ name: "Field1", type: "TEXT" }];
 
       for (const card of list) {
-        let fieldIdx = 0;
-        const handle = (value) => {
-          if (fieldIdx >= defFields.length) return;
-          const f = defFields[fieldIdx++];
-          if (!value || typeof value !== "string") return;
-          if (value.trim().length === 0) return;
+        const allValues = [
+          card.primaryField || "",
+          card.secondaryField || "",
+          ...(card.fields ? card.fields.split('\u001f') : [])
+        ];
 
-          if((f.type === 'IMAGE' && settings.includeImages) ||
-              ((f.type === 'AUDIO' || f.type === 'AUDIO_LONG') && settings.includeAudio)) {
-            pathSet.add(value.slice(5)); // remove 'data:' prefix
+        for (let i = 0; i < fieldNames.length; i++) {
+          const value = allValues[i] || "";
+          if (!value || !value.trim()) continue;
+
+          const defType = String(defFields[i]?.type || "").toUpperCase();
+
+          const isImageField = defType === "IMAGE";
+          const isAudioField = defType === "AUDIO" || defType === "AUDIO_LONG";
+
+          if ((isImageField && settings.includeImages) || (isAudioField && settings.includeAudio)) {
+            const paths = MediaHandler.extractMediaPaths(value);
+            if (paths.length === 0) {
+              const normalized = MediaHandler.normalizeMediaPath(value);
+              if (normalized) pathSet.add(normalized);
+            } else {
+              for (const path of paths) pathSet.add(path);
+            }
           }
-        };
-
-        handle(card.primaryField);
-        handle(card.secondaryField);
-        if(card.fields) {
-          for(const p of card.fields.split('\u001f')) handle(p);
         }
       }
     }
@@ -2850,7 +2960,8 @@ const ExportProcessor = {
       if(!dirtyPath) return null;
       if(!mediaDb) return null;
 
-      var path = dirtyPath.slice(5);
+      var path = MediaHandler.normalizeMediaPath(dirtyPath);
+      if(!path) return null;
       var ext = '.' + path.split('.').pop();
       if(ext.length >= 7) ext = '';
 
@@ -3224,6 +3335,22 @@ const ExportProcessor = {
 
 // UI setup - all the CSS and modal stuff
 const UI = {
+  memoryMenuObserver: null,
+
+  setNativeSkin: () => {
+    const useNative = true;
+    const backdrop = Utils.safeGetElement("mgkModalBackdrop");
+    const modal = Utils.safeGetElement(CONFIG.MODAL_ID);
+
+    // Old skin toggle logic kept for fallback:
+    // const useNative = !!enabled;
+    // const label = Utils.safeGetElement("mgkSkinLabel");
+
+    if (backdrop) backdrop.classList.toggle("mgk-native-skin", useNative);
+    if (modal) modal.classList.toggle("mgk-native-skin", useNative);
+    // if (label) label.innerText = useNative ? "Skin: Native" : "Skin: Original";
+  },
+
   injectStyles: () => {
     if (document.getElementById("mgkexporterStyles")) return;
 
@@ -3920,92 +4047,280 @@ const UI = {
         .video-info {
           padding: 12px 16px;
         }
+      }
+
+      .mgk-modal.mgk-native-skin {
+        width: min(820px, 95%) !important;
+        max-width: min(820px, 95%) !important;
+        background: rgba(26, 31, 44, 0.97);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 18px;
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.52);
+      }
+
+      .mgk-modal-backdrop.mgk-native-skin {
+        background: rgba(7, 10, 16, 0.62);
+        backdrop-filter: blur(7px);
+      }
+
+      .mgk-modal.mgk-native-skin .mgk-title {
+        color: rgba(255, 255, 255, 0.95);
+        font-size: 1.1rem;
+      }
+
+      .mgk-modal.mgk-native-skin .mgk-subtitle {
+        color: rgba(255, 255, 255, 0.55);
+      }
+
+      .mgk-modal.mgk-native-skin .mgk-controls {
+        margin-top: 16px;
+        gap: 14px;
+      }
+
+      .mgk-modal.mgk-native-skin .mgk-search,
+      .mgk-modal.mgk-native-skin .mgk-list,
+      .mgk-modal.mgk-native-skin .mgk-media-btn,
+      .mgk-modal.mgk-native-skin .mgk-input,
+      .mgk-modal.mgk-native-skin .mgk-preset,
+      .mgk-modal.mgk-native-skin #mgkSelectedBadge,
+      .mgk-modal.mgk-native-skin #mgkLanguageFilter {
+        background: rgba(255, 255, 255, 0.06) !important;
+        border-color: rgba(255, 255, 255, 0.16) !important;
+      }
+
+      .mgk-modal.mgk-native-skin #mgkModeLabel,
+      .mgk-modal.mgk-native-skin #mgkSkinLabel {
+        background: rgba(255, 255, 255, 0.06) !important;
+        border: 1px solid rgba(255, 255, 255, 0.16) !important;
+        color: rgba(255, 255, 255, 0.78) !important;
+        border-radius: 999px !important;
+      }
+
+      .mgk-modal.mgk-native-skin .mgk-button.mgk-secondary {
+        background: transparent;
+        border-color: rgba(255, 255, 255, 0.2);
+      }
+
+      .mgk-modal.mgk-native-skin .mgk-button:not(.mgk-secondary) {
+        background: linear-gradient(135deg, #6d6cf6, #8f55f7);
+        border-color: rgba(255, 255, 255, 0.22);
+      }
+
+      .mgk-modal.mgk-native-skin .mgk-status {
+        background: rgba(255, 255, 255, 0.04);
+        border-color: rgba(255, 255, 255, 0.12);
+      }
+
+      .mgk-modal.mgk-native-skin.UiModal__body.UiBottomSheet__byoScroll {
+        padding: 20px 22px;
+      }
+
+      .mgk-modal.mgk-native-skin .UiAlertModal__header {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+
+      .mgk-modal.mgk-native-skin .mgk-modal-titlewrap {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+      }
+
+      .mgk-modal.mgk-native-skin .mgk-modal-actions {
+        margin-left: auto;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        justify-content: flex-end;
+      }
+
+      .mgk-modal.mgk-native-skin .UiAlertModal__body {
+        display: grid;
+        gap: 14px;
+      }
+
+      .mgk-modal.mgk-native-skin .UiAlertModal__footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 16px;
+      }
+
+      .mgk-modal.mgk-native-skin .UiTypo.UiTypo__heading3.-heading {
+        margin: 0;
+        font-size: 1.12rem;
+        color: rgba(255, 255, 255, 0.94);
+        letter-spacing: 0;
+      }
+
+      .mgk-modal.mgk-native-skin .UiButton {
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 999px;
+        height: 40px;
+        padding: 0 20px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: filter 0.15s ease, background 0.15s ease;
+      }
+
+      .mgk-modal.mgk-native-skin .UiButton.-flat {
+        background: rgba(255, 255, 255, 0.06);
+        border-color: rgba(255, 255, 255, 0.14);
+        color: rgba(255, 255, 255, 0.88);
+      }
+
+      .mgk-modal.mgk-native-skin .UiButton.-flat:hover {
+        background: rgba(255, 255, 255, 0.11);
+      }
+
+      /* .UiButton.-gradient colour is intentionally inherited from Migaku's own stylesheet */
+
+      .mgk-modal.mgk-native-skin .UiButton__text {
+        line-height: 1;
+        display: flex;
+        align-items: center;
+      }
+
+      .mgk-modal.mgk-native-skin .UiTypo.UiTypo__buttonText {
+        font-size: 0.875rem !important;
+        font-weight: 600;
+        line-height: 1;
+      }
+
+      /* ── Tutorial overlay ── */
+      #mgkTutorialOverlay {
+        position: fixed;
+        inset: 0;
+        z-index: 99997;
+        pointer-events: none;
+      }
+
+      #mgkTutorialSpotlight {
+        position: fixed;
+        z-index: 2147483660;
+        border-radius: 12px;
+        box-shadow: 0 0 0 9999px rgba(0,0,0,0.72);
+        pointer-events: none;
+        transition: left 0.3s ease, top 0.3s ease, width 0.3s ease, height 0.3s ease, opacity 0.2s ease;
+      }
+
+      #mgkTutorialTooltip {
+        position: fixed;
+        z-index: 2147483661;
+        width: 280px;
+        background: rgba(22, 26, 40, 0.98);
+        border: 1px solid rgba(255,255,255,0.14);
+        border-radius: 14px;
+        padding: 16px 18px;
+        color: rgba(255,255,255,0.9);
+        font-size: 0.9rem;
+        line-height: 1.55;
+        pointer-events: all;
+        box-shadow: 0 12px 40px rgba(0,0,0,0.55);
+        transition: left 0.3s ease, top 0.3s ease;
+      }
+
+      .mgk-tut-footer {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .mgk-tut-step {
+        color: rgba(255,255,255,0.38);
+        font-size: 0.75rem;
+        margin-right: auto;
+      }
+
+      .mgk-tut-skip {
+        background: transparent;
+        border: none;
+        color: rgba(255,255,255,0.4);
+        font-size: 0.78rem;
+        cursor: pointer;
+        padding: 0;
+        text-decoration: underline;
+      }
+
+      .mgk-tut-skip:hover { color: rgba(255,255,255,0.7); }
+
+      .mgk-modal.mgk-native-skin .mgk-subtitle {
+        color: rgba(255, 255, 255, 0.5);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
     `;
 
     document.head.appendChild(styles);
   },
 
-  createMainUI: () => {
-    // Check if UI already exists
-    if (Utils.safeGetElement(CONFIG.FAB_ID)) {
-      return;
+  injectExportIntoMemoryPlusMenu: () => {
+    const actionSheet = document.querySelector(".UiPopover.-visible .UiActionSheet.-desktop");
+    if (!actionSheet) return false;
+    if (actionSheet.querySelector("#mgkExportToAnkiAction")) return true;
+
+    const sampleItem = actionSheet.querySelector(".UiActionSheet__item");
+    const li = document.createElement("li");
+    li.className = "UiActionSheet__item";
+    if (sampleItem && sampleItem.style.borderBottomWidth) {
+      li.style.borderBottomWidth = sampleItem.style.borderBottomWidth;
     }
 
+    li.innerHTML = `
+      <button type="button" id="mgkExportToAnkiAction" class="UiActionSheet__button UiActionSheet__action" aria-label="Export to Anki">
+        <div class="UiIcon UiActionSheet__icon" style="width: 24px;"><div class="UiIcon__inner"><div class="UiSvg UiIcon__svg" name="Anki" gradient="false" spin="false"><div class="UiSvg__inner">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" role="img">
+            <path fill="currentColor" fill-rule="evenodd" d="M19.61 3.573c-.265-1.984-2.793-2.662-4.014-1.076l-.38.493-.611-.112c-1.969-.362-3.395 1.834-2.263 3.485l.351.513-.296.547c-.952 1.76.695 3.795 2.615 3.229l.597-.176.429.45c1.38 1.45 3.823.512 3.879-1.488l.017-.622.561-.269c1.805-.864 1.668-3.478-.217-4.149l-.587-.209zm-2.4.926.104.777c.062.465.378.856.82 1.013l.74.263-.708.339a1.25 1.25 0 0 0-.71 1.093l-.022.784-.54-.568a1.25 1.25 0 0 0-1.26-.338l-.752.222.373-.69a1.25 1.25 0 0 0-.068-1.301l-.443-.648.771.142a1.25 1.25 0 0 0 1.217-.467zM10.092 10.048c-1.015-1.725-3.608-1.365-4.115.571l-.513 1.955-1.973.437c-1.954.432-2.414 3.01-.73 4.09l1.702 1.092-.194 2.012c-.193 1.992 2.116 3.225 3.665 1.957l1.563-1.28 1.854.806c1.835.799 3.721-1.016 2.994-2.88l-.735-1.884 1.34-1.513c1.326-1.499.183-3.854-1.815-3.738l-2.018.117zm-1.85 1.786 1.108 1.882c.238.404.682.641 1.15.614l2.18-.126-1.448 1.635a1.25 1.25 0 0 0-.229 1.283l.794 2.034-2.002-.872a1.25 1.25 0 0 0-1.29.18l-1.69 1.383.21-2.174a1.25 1.25 0 0 0-.57-1.172l-1.837-1.18 2.132-.471c.458-.101.82-.45.939-.903z" clip-rule="evenodd"></path>
+          </svg>
+        </div></div></div></div>
+        <div class="UiActionSheet__item__textContainer"><span class="UiTypo UiTypo__body -emphasis UiActionSheet__item__text">Export to Anki</span></div>
+      </button>
+    `;
+
+    actionSheet.appendChild(li);
+
+    const exportBtn = li.querySelector("#mgkExportToAnkiAction");
+    Utils.safeAddListener(exportBtn, "click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      UI.showMainModal();
+
+      const popover = exportBtn.closest(".UiPopover");
+      if (popover) popover.classList.remove("-visible");
+    });
+
+    return true;
+  },
+
+  ensureMemoryPlusIntegration: () => {
+    if (UI.memoryMenuObserver) return;
+
+    UI.memoryMenuObserver = new MutationObserver(() => {
+      UI.injectExportIntoMemoryPlusMenu();
+    });
+
+    UI.memoryMenuObserver.observe(document.body, { childList: true, subtree: true });
+    UI.injectExportIntoMemoryPlusMenu();
+  },
+
+  createMainUI: () => {
     UI.injectStyles();
     MappingModal.create();
 
-    const fab = document.createElement("div");
-    fab.className = "mgk-fab";
-    fab.id = CONFIG.FAB_ID;
-    fab.title = "Open Migaku Menu";
-    fab.innerHTML = "+";
-    document.body.appendChild(fab);
+    if (!Utils.safeGetElement("mgkModalBackdrop") || !Utils.safeGetElement(CONFIG.MODAL_ID)) {
+      UI.createExportModal();
+    }
 
-    const fabMenu = document.createElement("div");
-    fabMenu.className = "mgk-plus-menu";
-    fabMenu.id = "mgkFabMenu";
-    fabMenu.style.cssText = `
-      position: fixed;
-      left: 24px;
-      bottom: 88px;
-      background: var(--primary-bg);
-      border: 1px solid var(--border);
-      border-radius: var(--border-radius);
-      box-shadow: var(--shadow-medium);
-      display: none;
-      flex-direction: column;
-      z-index: 2147483646;
-      overflow: hidden;
-      min-width: 180px;
-    `;
-
-    fabMenu.innerHTML = `
-      <div class="mgk-plus-item" id="mgkComingSoon" style="padding:12px 16px;color:var(--text-primary);font-size:0.9rem;cursor:pointer;transition:all 0.2s ease;font-weight:500;">Coming Soon</div>
-      <div class="mgk-plus-item" id="mgkOpenMigakuGPT" style="padding:12px 16px;color:var(--text-primary);font-size:0.9rem;cursor:pointer;transition:all 0.2s ease;font-weight:500;">MigakuGPT (beta)</div>
-      <div class="mgk-plus-item" id="mgkOpenExporter" style="padding:12px 16px;color:var(--text-primary);font-size:0.9rem;cursor:pointer;transition:all 0.2s ease;font-weight:500;">Migaku Exporter</div>
-    `;
-
-    document.body.appendChild(fabMenu);
-
-
-    Utils.safeAddListener(fab, "click", () => {
-      const isVisible = fabMenu.style.display === "flex";
-      fabMenu.style.display = isVisible ? "none" : "flex";
-      const languageDropdown = Utils.safeGetElement("mgkLanguageFilter");
-      if (languageDropdown) {
-        const children = languageDropdown.children;
-        for(let i = 0; i < children.length; i++) {
-          const option = children[i];
-          option.selected = option.value === document.querySelector("main.MIGAKU-SRS")?.getAttribute?.("data-mgk-lang-selected");
-        }
-        languageDropdown.dispatchEvent(new Event("change"));
-      }
-    });
-
-    Utils.safeAddListener(Utils.safeGetElement("mgkComingSoon"), "click", () => {
-      Utils.setStatus("More features coming soon :)", "#06b6d4");
-      fabMenu.style.display = "none";
-    });
-
-    Utils.safeAddListener(Utils.safeGetElement("mgkOpenMigakuGPT"), "click", () => {
-      MigakuGPT.open();
-      fabMenu.style.display = "none";
-    });
-
-    Utils.safeAddListener(Utils.safeGetElement("mgkOpenExporter"), "click", () => {
-      fabMenu.style.display = "none";
-      UI.showMainModal();
-    });
-
-
-    document.addEventListener("click", (e) => {
-      if (!fab.contains(e.target) && !fabMenu.contains(e.target)) {
-        fabMenu.style.display = "none";
-      }
-    });
-
-
-    UI.createExportModal();
+    UI.ensureMemoryPlusIntegration();
   },
 
   createExportModal: () => {
@@ -4014,18 +4329,16 @@ const UI = {
     backdrop.id = "mgkModalBackdrop";
 
     const modal = document.createElement("div");
-    modal.className = "mgk-modal";
+    modal.className = "mgk-modal UiModal__body UiBottomSheet__byoScroll";
     modal.id = CONFIG.MODAL_ID;
 
     modal.innerHTML = `
-      <div style="display:flex;align-items:center;gap:12px;">
-        <div style="display:flex;flex-direction:column;">
-          <div style="display:flex;align-items:center;gap:12px;">
-            <div class="mgk-title">Migaku → Anki Exporter</div>
-            <div class="mgk-subtitle">Created by waraki - Forked from SirOlaf ❤️</div>
-          </div>
+      <div class="UiAlertModal__header">
+        <div class="mgk-modal-titlewrap">
+          <h3 class="UiTypo UiTypo__heading3 -heading">Migaku → Anki Exporter</h3>
+          <div class="mgk-subtitle">Created by waraki - Forked from SirOlaf ❤️</div>
         </div>
-        <div style="margin-left:auto;display:flex;gap:12px;align-items:center">
+        <div class="mgk-modal-actions">
           <div id="mgkModeLabel" style="font-weight:600;background:var(--secondary-bg);padding:8px 12px;border-radius:8px;color:var(--text-secondary);font-size:0.85rem;border:1px solid var(--border);">Mode: Simple</div>
           <label class="mgk-checkbox" title="Toggle Simple / Advanced">
             <input id="mgkSimpleMode" type="checkbox" checked>
@@ -4033,13 +4346,14 @@ const UI = {
               <span class="mgk-toggle-knob"></span>
             </span>
           </label>
-          <button id="mgkCloseBtn" class="mgk-button mgk-secondary">Close</button>
+          <button id="mgkCloseBtn" class="UiButton -flat" type="button" aria-label="Close export modal"><div class="UiButton__text"><span class="UiTypo UiTypo__buttonText">Close</span></div></button>
         </div>
       </div>
 
-      <div class="mgk-controls">
+      <div class="UiAlertModal__body">
+        <div class="mgk-controls">
         <div class="mgk-row">
-          <div style="flex:1; position:relative;">
+          <div id="mgkDeckSection" style="flex:1; position:relative;">
             <select id="mgkLanguageFilter" class="mgk-language-select" style="margin-bottom: 12px; width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--secondary-bg); color: var(--text); font-size: 14px; cursor: pointer;">
               <option value="">All Languages</option>
             </select>
@@ -4162,24 +4476,26 @@ const UI = {
               </div>
 
               <div style="margin-top:12px;">
-                <button id="mgkOpenMappingsBtn" class="mgk-button mgk-secondary">Open Field Mapping</button>
+                <button id="mgkOpenMappingsBtn" class="UiButton -flat" type="button"><div class="UiButton__text"><span class="UiTypo UiTypo__buttonText">Open Field Mapping</span></div></button>
               </div>
             </div>
           </div>
         </div>
 
-        <div style="display:flex;gap:12px;justify-content:flex-end;">
-          <input type="hidden" id="mgkDeckSelectHidden">
-          <button id="mgkExportDeckBtn" class="mgk-button">Export selected decks</button>
-          <button id="mgkExportWordlistBtn" class="mgk-button mgk-secondary">Export wordlists</button>
-        </div>
-
         <div id="mgkexporterStatusMessage" class="mgk-status">Ready</div>
+      </div>
+
+      <div class="UiAlertModal__footer">
+          <input type="hidden" id="mgkDeckSelectHidden">
+          <button id="mgkExportWordlistBtn" class="UiButton -flat" type="button"><div class="UiButton__text"><span class="UiTypo UiTypo__buttonText">Export wordlists</span></div></button>
+          <button id="mgkExportDeckBtn" class="UiButton -gradient" type="button"><div class="UiButton__text"><span class="UiTypo UiTypo__buttonText">Export selected decks</span></div></button>
+      </div>
       </div>
     `;
 
     backdrop.appendChild(modal);
     document.body.appendChild(backdrop);
+    UI.setNativeSkin();
 
 
     Utils.safeAddListener(Utils.safeGetElement("mgkCloseBtn"), "click", UI.hideMainModal);
@@ -4274,6 +4590,17 @@ const UI = {
       });
     }
     updateModeUI();
+
+    // Old skin toggle wiring kept for fallback:
+    // const nativeSkinToggle = Utils.safeGetElement("mgkNativeSkin");
+    // if (nativeSkinToggle) {
+    //   Utils.safeAddListener(nativeSkinToggle, "change", () => {
+    //     UI.setNativeSkin(nativeSkinToggle.checked);
+    //     Storage.saveSettings({ nativeSkin: nativeSkinToggle.checked });
+    //   });
+    // }
+    // UI.setNativeSkin(nativeSkinToggle?.checked ?? false);
+    UI.setNativeSkin();
 
 
     Utils.safeAddListener(Utils.safeGetElement("mgkOpenMappingsBtn"), "click", () => {
@@ -4507,6 +4834,7 @@ const UI = {
   destroyUI: () => {
     const fab = Utils.safeGetElement(CONFIG.FAB_ID);
     const fabMenu = Utils.safeGetElement("mgkFabMenu");
+    const exportAction = Utils.safeGetElement("mgkExportToAnkiAction");
 
     if (fab && fab.parentNode) {
       fab.parentNode.removeChild(fab);
@@ -4514,14 +4842,26 @@ const UI = {
     if (fabMenu && fabMenu.parentNode) {
       fabMenu.parentNode.removeChild(fabMenu);
     }
+
+    if (exportAction && exportAction.parentNode && exportAction.parentNode.parentNode) {
+      exportAction.parentNode.parentNode.removeChild(exportAction.parentNode);
+    }
+
+    if (UI.memoryMenuObserver) {
+      UI.memoryMenuObserver.disconnect();
+      UI.memoryMenuObserver = null;
+    }
   }
 };
 
 // Route monitoring (copied from stats.js pattern)
 function handleRouteChange() {
-  const isRootPath = window.location.pathname === '/' || window.location.pathname === '';
+  const path = window.location.pathname || "";
+  const isRootPath = path === '/' || path === '';
+  const isMemoryRoute = path.toLowerCase().includes("memory");
+  const hasHomePlusButton = !!document.querySelector("button.HomePlusButton__button, button[aria-label='ID:HomePlusButton.open']");
 
-  if (isRootPath) {
+  if (isRootPath || isMemoryRoute || hasHomePlusButton) {
     UI.createMainUI();
   } else {
     UI.destroyUI();
@@ -4553,6 +4893,194 @@ function setupRouteListener() {
 }
 
 // Main init function
+// ── Tutorial ──────────────────────────────────────────────────────────────────
+const TutorialManager = {
+  _step: 0,
+  _pendingTimer: null,
+  _rafId: null,
+
+  STEPS: [
+    {
+      sel: 'button.HomePlusButton__button, button[aria-label="ID:HomePlusButton.open"]',
+      text: 'Welcome! First, click the <strong>+ button</strong> in the bottom-right to open the Memory menu.',
+      pos: 'top',
+      advance: 'click',
+    },
+    {
+      sel: '#mgkExportToAnkiAction',
+      text: 'Now click <strong>Export to Anki</strong> in the menu.',
+      pos: 'left',
+      advance: 'click',
+    },
+    {
+      sel: '#mgkDeckSection',
+      text: 'Select a <strong>deck</strong> from the list to export.',
+      pos: 'right',
+      advance: 'child',
+      childSel: '.mgk-list-inner-item',
+    },
+    {
+      sel: '#mgkExportDeckBtn',
+      text: 'Click <strong>Export selected decks</strong> to generate your Anki .apkg file.',
+      pos: 'top',
+      advance: 'click',
+    },
+    {
+      sel: 'label:has(#mgkSimpleMode) .mgk-toggle-track',
+      text: 'You can toggle between <strong>Simple</strong> and <strong>Advanced</strong> mode here for more export options.',
+      pos: 'bottom',
+      advance: 'gotit',
+    },
+  ],
+
+  maybeStart() {
+    if (Storage.loadSettings().tutorialDone) return;
+    setTimeout(() => TutorialManager.start(), 1200);
+  },
+
+  start() {
+    TutorialManager._step = 0;
+    if (!document.getElementById('mgkTutorialOverlay')) {
+      const ov = document.createElement('div'); ov.id = 'mgkTutorialOverlay';
+      const sp = document.createElement('div'); sp.id = 'mgkTutorialSpotlight';
+      const tt = document.createElement('div'); tt.id = 'mgkTutorialTooltip';
+      document.body.append(ov, sp, tt);
+    }
+    TutorialManager._goToStep(0);
+  },
+
+  _goToStep(n) {
+    clearTimeout(TutorialManager._pendingTimer);
+    // Hide spotlight during transition so it doesn't shadow popover/modal
+    const sp = document.getElementById('mgkTutorialSpotlight');
+    if (sp) sp.style.opacity = '0';
+    const step = TutorialManager.STEPS[n];
+    if (!step) { TutorialManager.finish(); return; }
+
+    const tryAttach = () => {
+      const el = document.querySelector(step.sel);
+      if (!el) { TutorialManager._pendingTimer = setTimeout(tryAttach, 350); return; }
+      // Re-show spotlight now that target is found
+      const sp2 = document.getElementById('mgkTutorialSpotlight');
+      if (sp2) sp2.style.opacity = '1';
+      TutorialManager._attach(el, step, n);
+    };
+    tryAttach();
+  },
+
+  _resizeObserver: null,
+
+  _updateSpotlight(el, pad) {
+    const sp = document.getElementById('mgkTutorialSpotlight');
+    if (!sp) return;
+    const rect = el.getBoundingClientRect();
+    sp.style.left   = `${rect.left   - pad}px`;
+    sp.style.top    = `${rect.top    - pad}px`;
+    sp.style.width  = `${rect.width  + pad * 2}px`;
+    sp.style.height = `${rect.height + pad * 2}px`;
+  },
+
+  _attach(el, step, n) {
+    const total = TutorialManager.STEPS.length;
+    const pad = 10;
+    const rect = el.getBoundingClientRect();
+
+    // Stop any previous observer
+    if (TutorialManager._resizeObserver) {
+      TutorialManager._resizeObserver.disconnect();
+      TutorialManager._resizeObserver = null;
+    }
+
+    // Position spotlight + keep it live as element resizes
+    TutorialManager._updateSpotlight(el, pad);
+    TutorialManager._resizeObserver = new ResizeObserver(() => TutorialManager._updateSpotlight(el, pad));
+    TutorialManager._resizeObserver.observe(el);
+    // Also poll with rAF for position changes (scroll / modal slide-in)
+    let rafId;
+    const trackPos = () => {
+      if (!document.getElementById('mgkTutorialSpotlight')) return;
+      TutorialManager._updateSpotlight(el, pad);
+      rafId = requestAnimationFrame(trackPos);
+    };
+    rafId = requestAnimationFrame(trackPos);
+    // Store rafId for cleanup
+    TutorialManager._rafId = rafId;
+
+    // Lift target above overlay
+    const prevZ = el.style.zIndex;
+    const prevPos = el.style.position;
+    if (!el.style.position || el.style.position === 'static') el.style.position = 'relative';
+    el.style.zIndex = '100000';
+
+    // Build tooltip
+    const tt = document.getElementById('mgkTutorialTooltip');
+    if (!tt) return;
+    const isGotIt = step.advance === 'gotit';
+    tt.innerHTML = `
+      <div>${step.text}</div>
+      <div class="mgk-tut-footer">
+        <span class="mgk-tut-step">${n + 1} / ${total}</span>
+        <button class="mgk-tut-skip">Skip tutorial</button>
+        ${isGotIt ? '<button class="UiButton -gradient mgk-tut-gotit">Got it</button>' : ''}
+      </div>`;
+
+    // Position tooltip
+    const ttW = 280, ttH = 120, vp = 10;
+    let L, T;
+    if (step.pos === 'top')    { L = rect.left + rect.width/2 - ttW/2;  T = rect.top - ttH - 14; }
+    else if (step.pos === 'bottom') { L = rect.left + rect.width/2 - ttW/2; T = rect.bottom + 14; }
+    else if (step.pos === 'left')   { L = rect.left - ttW - 14; T = rect.top + rect.height/2 - ttH/2; }
+    else                            { L = rect.right + 14;      T = rect.top + rect.height/2 - ttH/2; }
+    L = Math.max(vp, Math.min(L, window.innerWidth  - ttW - vp));
+    T = Math.max(vp, Math.min(T, window.innerHeight - ttH - vp));
+    tt.style.left = `${L}px`;
+    tt.style.top  = `${T}px`;
+
+    // Restore element styles helper
+    const restore = () => {
+      el.style.zIndex = prevZ;
+      el.style.position = prevPos;
+      if (TutorialManager._resizeObserver) { TutorialManager._resizeObserver.disconnect(); TutorialManager._resizeObserver = null; }
+      cancelAnimationFrame(TutorialManager._rafId);
+    };
+
+    // Wire skip
+    tt.querySelector('.mgk-tut-skip').onclick = () => TutorialManager.finish();
+
+    // Wire advance
+    if (isGotIt) {
+      tt.querySelector('.mgk-tut-gotit').onclick = () => { restore(); TutorialManager.finish(); };
+    } else if (step.advance === 'child') {
+      // Listen for a click on any matching child (deck items added dynamically)
+      const onChildClick = (e) => {
+        if (e.target.closest(step.childSel)) {
+          el.removeEventListener('click', onChildClick);
+          restore();
+          setTimeout(() => TutorialManager._goToStep(n + 1), 350);
+        }
+      };
+      el.addEventListener('click', onChildClick);
+    } else {
+      const onElClick = () => {
+        el.removeEventListener('click', onElClick);
+        restore();
+        setTimeout(() => TutorialManager._goToStep(n + 1), 350);
+      };
+      el.addEventListener('click', onElClick);
+    }
+  },
+
+  finish() {
+    clearTimeout(TutorialManager._pendingTimer);
+    cancelAnimationFrame(TutorialManager._rafId);
+    if (TutorialManager._resizeObserver) { TutorialManager._resizeObserver.disconnect(); TutorialManager._resizeObserver = null; }
+    Storage.saveSettings({ tutorialDone: true });
+    document.getElementById('mgkTutorialOverlay')?.remove();
+    document.getElementById('mgkTutorialSpotlight')?.remove();
+    document.getElementById('mgkTutorialTooltip')?.remove();
+  },
+};
+
 let globalSqlDbHandle = null;
 
 async function initializeMigakuExporter() {
@@ -4592,8 +5120,6 @@ async function initializeMigakuExporter() {
     setupRouteListener();
     handleRouteChange();
 
-    MigakuGPT.init();
-
     // populate deck list
     const decks = DatabaseOps.listDecks(globalSqlDbHandle);
     const lang = document.querySelector("main.MIGAKU-SRS")?.getAttribute?.("data-mgk-lang-selected") || null;
@@ -4629,6 +5155,10 @@ async function initializeMigakuExporter() {
     };
 
     applyToCheckbox("mgkSimpleMode", settings.simpleMode);
+    // Old skin toggle restore lines:
+    // applyToCheckbox("mgkNativeSkin", settings.nativeSkin);
+    // UI.setNativeSkin(settings.nativeSkin);
+    UI.setNativeSkin();
     applyToCheckbox("mgkIncludeImages", settings.includeImages);
     applyToCheckbox("mgkIncludeAudio", settings.includeAudio);
     applyToCheckbox("mgkKeepSyntax", settings.keepSyntax);
@@ -4703,6 +5233,8 @@ async function initializeMigakuExporter() {
       // save settings to localStorage
       Storage.saveSettings({
         simpleMode: simple,
+        // Old skin toggle setting (fallback):
+        // nativeSkin: Utils.safeGetElement("mgkNativeSkin")?.checked ?? false,
         includeImages: opts.includeImages,
         includeAudio: opts.includeAudio,
         keepSyntax: opts.keepSyntax,
@@ -4766,6 +5298,7 @@ async function initializeMigakuExporter() {
 
     Utils.setStatus("Migaku Exporter loaded successfully!", "#10b981");
     Utils.log("Initialization complete");
+    TutorialManager.maybeStart();
 
   } catch (error) {
     console.error("[MGK] Initialization failed:", error);
@@ -4797,17 +5330,15 @@ window.migakuExporterV3 = {
   DatabaseOps,
   FieldMapper,
   AnkiBuilder,
-  MigakuGPT,
   MediaHandler,
   ExportProcessor,
   UI,
   MappingModal,
   DeckProtection,
+  TutorialManager,
   initializeMigakuExporter,
   CONFIG
 };
-
-window.MigakuGPT = MigakuGPT;
 
 // startup + recovery logic (in case migaku's page loads weird)
 (function robustMigakuLauncher() {
@@ -4817,6 +5348,9 @@ window.MigakuGPT = MigakuGPT;
   });
 
   window.migakuExporter = window.migakuExporterV3;
+
+  // Start the memory + menu observer immediately, no need to wait for DB
+  UI.ensureMemoryPlusIntegration();
 
   let recoveryAttempts = 0;
   const maxRecoveryAttempts = 30;
@@ -4834,7 +5368,7 @@ window.MigakuGPT = MigakuGPT;
         recoveryAttempts++;
 
         try {
-          if (!Utils.safeGetElement(CONFIG.FAB_ID)) {
+          if (!Utils.safeGetElement(CONFIG.MODAL_ID)) {
             try {
               UI.createMainUI();
               Utils.log(`[MGK] UI created by recovery (attempt ${recoveryAttempts})`);
@@ -4843,7 +5377,7 @@ window.MigakuGPT = MigakuGPT;
             }
           }
 
-          if (Utils.safeGetElement(CONFIG.FAB_ID)) {
+          if (Utils.safeGetElement(CONFIG.MODAL_ID)) {
             Utils.log("Recovery successful - UI is present");
             Utils.setStatus("Initialized (recovered)", "#f59e0b");
             clearInterval(recoveryInterval);
