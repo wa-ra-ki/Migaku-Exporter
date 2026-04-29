@@ -4,7 +4,7 @@
 // @match       https://study.migaku.com/*
 // @grant       GM_getResourceURL
 // @run-at      document-idle
-// @version     2.1
+// @version     2.2
 // @author      waraki (Forked From SirOlaf)
 // @description Migaku → Anki exporter
 // @require     data:application/javascript,%3BglobalThis.setImmediate%3DsetTimeout%3B
