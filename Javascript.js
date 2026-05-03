@@ -3,6 +3,7 @@
 // @namespace   http://tampermonkey.net/
 // @match       https://study.migaku.com/*
 // @grant       GM_getResourceURL
+// @grant       GM_xmlhttpRequest
 // @run-at      document-idle
 // @version     2.2
 // @author      waraki (Forked From SirOlaf)
@@ -14,6 +15,7 @@
 // @supportURL  https://github.com/wa-ra-ki/Migaku-Exporter/issues
 // @connect     github.com
 // @connect     raw.githubusercontent.com
+// @connect     localhost
 // @downloadURL https://raw.githubusercontent.com/wa-ra-ki/Migaku-Exporter/main/Javascript.js
 // @updateURL   https://raw.githubusercontent.com/wa-ra-ki/Migaku-Exporter/main/Javascript.js
 // ==/UserScript==
@@ -29,6 +31,7 @@ const CONFIG = {
   MAPPING_STORAGE_KEY: "migaku_to_anki_mappings",
   SETTINGS_STORAGE_KEY: "migaku_exporter_settings",
   CHAT_API_KEY_STORAGE: "migaku_gpt_api_key",
+  ANKI_SETTINGS_KEY: "migaku_anki_target_settings",
 
   MIGAKU_FIELDS: [
     'Word', 'Sentence', 'Translated Sentence', 'Definitions',
@@ -159,6 +162,74 @@ const Storage = {
 
   loadApiKey: () => {
     return localStorage.getItem(CONFIG.CHAT_API_KEY_STORAGE) || "";
+  },
+
+  saveAnkiTarget: (obj) => {
+    localStorage.setItem(CONFIG.ANKI_SETTINGS_KEY, JSON.stringify(obj || {}));
+  },
+
+  loadAnkiTarget: () => {
+    try { return JSON.parse(localStorage.getItem(CONFIG.ANKI_SETTINGS_KEY) || "{}"); } catch(e) { return {}; }
+  }
+};
+
+// AnkiConnect integration - talks to the Anki desktop app via its local REST API
+const AnkiConnect = {
+  URL: "http://localhost:8765",
+
+  request(action, params = {}) {
+    const body = JSON.stringify({ action, version: 6, params });
+    return new Promise((resolve, reject) => {
+      if (typeof GM_xmlhttpRequest !== "undefined") {
+        GM_xmlhttpRequest({
+          method: "POST",
+          url: AnkiConnect.URL,
+          headers: { "Content-Type": "application/json" },
+          data: body,
+          onload: (resp) => {
+            try {
+              const data = JSON.parse(resp.responseText);
+              if (data.error) reject(new Error(data.error));
+              else resolve(data.result);
+            } catch (e) { reject(e); }
+          },
+          onerror: () => reject(new Error("AnkiConnect connection failed"))
+        });
+      } else {
+        fetch(AnkiConnect.URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body
+        }).then(r => r.json()).then(data => {
+          if (data.error) throw new Error(data.error);
+          resolve(data.result);
+        }).catch(reject);
+      }
+    });
+  },
+
+  async testConnection() {
+    try { await AnkiConnect.request("version"); return true; } catch { return false; }
+  },
+
+  async getDeckNames() {
+    return await AnkiConnect.request("deckNames");
+  },
+
+  async getNoteTypeNamesAndIds() {
+    return await AnkiConnect.request("modelNamesAndIds");
+  },
+
+  async getFieldNames(modelName) {
+    return await AnkiConnect.request("modelFieldNames", { modelName });
+  },
+
+  async addNotes(notes) {
+    return await AnkiConnect.request("addNotes", { notes });
+  },
+
+  async storeMediaFile(filename, base64Data) {
+    return await AnkiConnect.request("storeMediaFile", { filename, data: base64Data, deleteExisting: false });
   }
 };
 
@@ -551,10 +622,20 @@ const AnkiBuilder = {
     return db;
   },
 
-  insertCollectionMetadata(db, usedCardTypes, mappings, useTemplates) {
+  insertCollectionMetadata(db, usedCardTypes, mappings, useTemplates, ankiTarget = {}) {
+    if (!usedCardTypes || usedCardTypes.length === 0) {
+      throw new Error("No card types to export");
+    }
     var mapping = new Map();
-    for(const ct of usedCardTypes) {
-      mapping.set(ct.id, Number(String(Date.now()).slice(0,10) + String(ct.id)));
+    if (ankiTarget.noteType) {
+      // All Migaku card types collapsed into the single chosen Anki note type
+      for(const ct of usedCardTypes) {
+        mapping.set(ct.id, ankiTarget.noteType.id);
+      }
+    } else {
+      for(const ct of usedCardTypes) {
+        mapping.set(ct.id, Number(String(Date.now()).slice(0,10) + String(ct.id)));
+      }
     }
 
     var conf = {
@@ -563,6 +644,27 @@ const AnkiBuilder = {
     };
 
     var models = {};
+    if (ankiTarget.noteType) {
+      const modelId = ankiTarget.noteType.id;
+      const fieldNames = ankiTarget.noteType.fields || FieldMapper.getFieldNames();
+      const fields = fieldNames.map((name, ord) => ({
+        font: "Arial", media: [], name, ord, rtl: false, size: 20, sticky: false
+      }));
+      models[modelId] = {
+        css: "", did: 1, flds: fields, id: modelId,
+        latexPost: "", latexPre: "", mod: Math.floor(Date.now() / 1000),
+        name: ankiTarget.noteType.name,
+        req: [], sortf: 0, tags: [],
+        tmpls: [{
+          name: "Basic",
+          qfmt: `{{${fields[0]?.name || "Front"}}}`,
+          did: null, bafmt: "",
+          afmt: `{{FrontSide}}<hr id="answer"><br>${fields.slice(1).map(f=>`{{${f.name}}}`).join("<br>")}`,
+          ord: 0, bqfmt: ""
+        }],
+        type: 0, usn: -1, vers: []
+      };
+    } else
     for(const ct of usedCardTypes) {
       var fields = [];
 
@@ -646,7 +748,7 @@ const AnkiBuilder = {
 
     const decks = {
       1: {
-        name: "Default", extendRev: 10, usn: -1, collapsed: false, browserCollapsed: false,
+        name: ankiTarget.deckName || "Default", extendRev: 10, usn: -1, collapsed: false, browserCollapsed: false,
         newToday: [0,0], revToday: [0,0], lrnToday: [0,0], timeToday: [0,0],
         dyn: 0, extendNew: 10, conf: 1, id: 1, mod: Date.now(), desc: ""
       }
@@ -2569,6 +2671,7 @@ const MappingModal = {
 
     Utils.safeAddListener(Utils.safeGetElement("mgkMapSave"), "click", () => {
       const inputs = card.querySelectorAll("input[data-migaku-name]");
+      if (inputs.length === 0) return; // Anki mapping mode — handled by renderAnkiMapping
       const arr = [];
       inputs.forEach(inp => {
         arr.push({
@@ -2586,8 +2689,124 @@ const MappingModal = {
   },
 
   open: () => {
-    MappingModal.renderGlobalMapping();
+    const ankiTarget = Storage.loadAnkiTarget();
+    const noteTypeRaw = Utils.safeGetElement("mgkAnkiTargetNoteType")?.value || "";
+    if (noteTypeRaw) {
+      MappingModal.renderAnkiMapping(noteTypeRaw);
+    } else {
+      MappingModal.renderGlobalMapping();
+    }
     Utils.safeGetElement(CONFIG.MAPPING_MODAL_ID).style.display = "flex";
+  },
+
+  renderAnkiMapping: (noteTypeRaw) => {
+    const body = Utils.safeGetElement("mgkMapBody");
+    if (!body) return;
+
+    let nt;
+    try { nt = JSON.parse(noteTypeRaw); } catch { MappingModal.renderGlobalMapping(); return; }
+
+    // update modal title
+    const titleEl = Utils.safeGetElement("mgkMapCard")?.querySelector("div[style*='color:#4f46e5']");
+    if (titleEl) titleEl.textContent = `Field Mapping — ${nt.name}`;
+
+    body.innerHTML = `<div style="margin-bottom:16px;color:rgba(255,255,255,0.7);font-size:0.9rem;">
+      Map each <strong style="color:white;">${nt.name}</strong> field to its Migaku source content.
+      Use <em>(skip)</em> to leave a field empty.
+    </div>`;
+
+    AnkiConnect.getFieldNames(nt.name).then(ankiFields => {
+      const savedFm = Storage.loadAnkiTarget().fieldMapping || {};
+      const migakuFields = CONFIG.MIGAKU_FIELDS;
+
+      const container = document.createElement("div");
+      container.style.cssText = "display:flex;flex-direction:column;gap:14px;";
+
+      ankiFields.forEach(ankiField => {
+        const row = document.createElement("div");
+        row.style.cssText = "display:flex;gap:16px;align-items:center;";
+
+        const left = document.createElement("div");
+        left.style.cssText = "width:40%;font-size:0.9rem;color:rgba(255,255,255,0.9);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
+        left.title = ankiField;
+        left.textContent = ankiField;
+
+        const right = document.createElement("div");
+        right.style.cssText = "width:60%;";
+
+        const sel = document.createElement("select");
+        sel.style.cssText = `
+          width:100%;
+          padding:12px 16px;
+          box-sizing:border-box;
+          background:rgba(255,255,255,0.08);
+          border:1px solid rgba(255,255,255,0.15);
+          color:white;
+          border-radius:10px;
+          font-size:0.9rem;
+          cursor:pointer;
+          backdrop-filter:blur(10px);
+        `;
+        sel.dataset.ankiField = ankiField;
+        sel.innerHTML = `<option value="">(skip)</option>` +
+          migakuFields.map((mf, i) => `<option value="${i}">${mf}</option>`).join("");
+
+        // restore saved or auto-map
+        if (savedFm[ankiField] !== undefined && savedFm[ankiField] !== null) {
+          sel.value = String(savedFm[ankiField]);
+        } else {
+          const autoIdx = migakuFields.findIndex(mf =>
+            mf.toLowerCase().replace(/[^a-z]/g, "") === ankiField.toLowerCase().replace(/[^a-z]/g, "")
+          );
+          if (autoIdx >= 0) sel.value = String(autoIdx);
+        }
+
+        right.appendChild(sel);
+        row.appendChild(left);
+        row.appendChild(right);
+        container.appendChild(row);
+      });
+
+      body.appendChild(container);
+
+      // wire the Save button to persist fieldMapping
+      const saveBtn = Utils.safeGetElement("mgkMapSave");
+      if (saveBtn) {
+        saveBtn.onclick = () => {
+          const fm = {};
+          container.querySelectorAll("select[data-anki-field]").forEach(s => {
+            fm[s.dataset.ankiField] = s.value === "" ? null : Number(s.value);
+          });
+          const cur = Storage.loadAnkiTarget();
+          Storage.saveAnkiTarget({ ...cur, fieldMapping: fm });
+          Utils.setStatus("Field mapping saved!", "#10b981");
+          Utils.safeGetElement(CONFIG.MAPPING_MODAL_ID).style.display = "none";
+        };
+      }
+
+      // Auto-map button
+      const autoBtn = Utils.safeGetElement("mgkMapAuto");
+      if (autoBtn) {
+        autoBtn.onclick = () => {
+          container.querySelectorAll("select[data-anki-field]").forEach(s => {
+            const autoIdx = migakuFields.findIndex(mf =>
+              mf.toLowerCase().replace(/[^a-z]/g, "") === s.dataset.ankiField.toLowerCase().replace(/[^a-z]/g, "")
+            );
+            s.value = autoIdx >= 0 ? String(autoIdx) : "";
+          });
+        };
+      }
+
+      // Reset button clears all
+      const resetBtn = Utils.safeGetElement("mgkMapReset");
+      if (resetBtn) {
+        resetBtn.onclick = () => {
+          container.querySelectorAll("select[data-anki-field]").forEach(s => { s.value = ""; });
+        };
+      }
+    }).catch(e => {
+      body.innerHTML = `<div style="color:#ef4444;padding:16px;">Could not load note type fields. Make sure Anki is open with AnkiConnect.</div>`;
+    });
   },
 
 renderGlobalMapping: () => {
@@ -2952,6 +3171,136 @@ const MediaHandler = {
 
 // export logic
 const ExportProcessor = {
+
+  async pushToAnkiDirect(mediaDb, cardsByType, cardTypes, options, totalForProgress = null) {
+    const { ankiTarget } = options;
+    const deckName = ankiTarget.deckName;
+    const modelName = ankiTarget.noteType ? ankiTarget.noteType.name : null;
+    const ankiFieldNames = ankiTarget.noteType ? (ankiTarget.noteType.fields || []) : [];
+    // fieldMapping: { [ankiFieldName]: migakuFieldIndex (0-based) | null }
+    const fieldMapping = ankiTarget.fieldMapping || {};
+    const migakuFields = CONFIG.MIGAKU_FIELDS;
+
+    // helper: get blob from cache, upload to Anki, return filename
+    const uploadedMedia = new Map();
+    async function ensureMediaInAnki(dirtyPath) {
+      if (!dirtyPath) return null;
+      if (!mediaDb) return null;
+      const path = MediaHandler.normalizeMediaPath(dirtyPath);
+      if (!path) return null;
+      const ext = ('.' + path.split('.').pop()).length >= 7 ? '' : ('.' + path.split('.').pop());
+      const shaBuf = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(path));
+      const shaHex = Array.from(new Uint8Array(shaBuf)).map(b => b.toString(16).padStart(2, '0')).join('') + ext;
+      if (uploadedMedia.has(shaHex)) return shaHex;
+      const blob = await MediaHandler.getBlobFromMediaCache(mediaDb, shaHex);
+      if (!blob) return null;
+      try {
+        const b64 = await new Promise((res, rej) => {
+          const reader = new FileReader();
+          reader.onload = () => res(reader.result.split(',')[1]);
+          reader.onerror = rej;
+          reader.readAsDataURL(blob);
+        });
+        await AnkiConnect.storeMediaFile(shaHex, b64);
+        uploadedMedia.set(shaHex, shaHex);
+      } catch (e) { Utils.log('Media upload failed:', e); }
+      return shaHex;
+    }
+
+    let totalCards = 0;
+    for (const l of cardsByType.values()) totalCards += l.length;
+    const total = totalForProgress || totalCards;
+    let processed = 0;
+    const BATCH = 50;
+    const notesBatch = [];
+    let addedCount = 0;
+
+    const flushBatch = async () => {
+      if (notesBatch.length === 0) return;
+      try {
+        const results = await AnkiConnect.addNotes(notesBatch);
+        addedCount += (results || []).filter(r => r !== null).length;
+      } catch (e) {
+        Utils.log('addNotes batch failed:', e);
+      }
+      notesBatch.length = 0;
+    };
+
+    for (const typeKey of cardsByType.keys()) {
+      const list = cardsByType.get(typeKey);
+      const ct = cardTypes.get(typeKey);
+      for (const card of list) {
+        // Build raw values indexed to CONFIG.MIGAKU_FIELDS (don't rely on global field mapping)
+        const rawFields = [
+          card.primaryField || "",
+          card.secondaryField || "",
+          ...(card.fields ? card.fields.split("\u001f") : [])
+        ];
+        const defFields = (ct && ct.config && Array.isArray(ct.config.fields)) ? ct.config.fields : [];
+        const rawValues = [];
+        for (let i = 0; i < migakuFields.length; i++) {
+          let rawValue = rawFields[i] || "";
+          const defType = String(defFields[i]?.type || "").toUpperCase();
+          if (defType === "IMAGE" && options.includeImages && rawValue) {
+            const refs = MediaHandler.extractMediaPaths(rawValue);
+            const toProcess = refs.length === 0 ? [rawValue] : refs;
+            const tags = [];
+            for (const ref of toProcess) {
+              const n = await ensureMediaInAnki(ref);
+              if (n) tags.push(`<img src="${n}">`);
+            }
+            rawValues.push(tags.join("<br>"));
+          } else if ((defType === "AUDIO" || defType === "AUDIO_LONG") && options.includeAudio && rawValue) {
+            const refs = MediaHandler.extractMediaPaths(rawValue);
+            const toProcess = refs.length === 0 ? [rawValue] : refs;
+            const tags = [];
+            for (const ref of toProcess) {
+              const n = await ensureMediaInAnki(ref);
+              if (n) tags.push(`[sound:${n}]`);
+            }
+            rawValues.push(tags.join(" "));
+          } else {
+            if (!options.keepSyntax && rawValue) {
+              rawValue = rawValue.replaceAll(/\[.*?\]/g, "").replaceAll(/[{}]/g, "");
+            }
+            rawValues.push(rawValue);
+          }
+        }
+        const fieldsObj = {};
+        if (ankiFieldNames.length > 0 && Object.keys(fieldMapping).length > 0) {
+          // Use explicit field mapping: each Anki field → Migaku field index
+          ankiFieldNames.forEach(ankiField => {
+            const migIdx = fieldMapping[ankiField];
+            fieldsObj[ankiField] = (migIdx !== null && migIdx !== undefined) ? (rawValues[migIdx] || '') : '';
+          });
+        } else if (ankiFieldNames.length > 0) {
+          // Fallback: auto-map by name match, then position
+          ankiFieldNames.forEach((ankiField, i) => {
+            const autoIdx = migakuFields.findIndex(mf =>
+              mf.toLowerCase().replace(/[^a-z]/g, '') === ankiField.toLowerCase().replace(/[^a-z]/g, '')
+            );
+            fieldsObj[ankiField] = rawValues[autoIdx >= 0 ? autoIdx : i] || '';
+          });
+        } else {
+          // No note type selected: use Migaku field names as-is
+          FieldMapper.getFieldNames().forEach((name, i) => { fieldsObj[name] = rawValues[i] || ''; });
+        }
+        notesBatch.push({
+          deckName,
+          modelName: modelName || (ct ? ct.name : 'Basic'),
+          fields: fieldsObj,
+          options: { allowDuplicate: false, duplicateScope: 'deck' },
+          tags: []
+        });
+        processed++;
+        Progress.set((processed / Math.max(1, total)) * 95, `Sending cards – ${processed}/${total}`);
+        if (notesBatch.length >= BATCH) await flushBatch();
+      }
+    }
+    await flushBatch();
+    return addedCount;
+  },
+
   async fillNotesAndCards(ankiDb, mediaDb, zip, cardsByType, cardTypes, modelMapping, settings) {
     const mediaReverseMap = new Map();
     let nextMediaIndex = 0;
@@ -3099,11 +3448,31 @@ const ExportProcessor = {
       cardsByType.get(c.cardTypeId).push(c);
     }
 
-    var usedCardTypes = Array.from(cardsByType.keys()).map(k => cardTypes.get(k));
+    var usedCardTypes = Array.from(cardsByType.keys()).map(k => cardTypes.get(k)).filter(Boolean);
+    if (usedCardTypes.length === 0) {
+      Utils.setStatus("No cards found in selected decks", "#ef4444");
+      Progress.hide();
+      return;
+    }
     if (DeckProtection.checkForbiddenContent(usedCardTypes)) {
       var msg = DeckProtection.getForbiddenMessage();
       Utils.setStatus(msg, "#ef4444");
       throw new Error(msg);
+    }
+
+    // Direct push to Anki via AnkiConnect when a target deck is selected
+    if (options.ankiTarget && options.ankiTarget.deckName) {
+      Progress.show("Connecting to Anki...", 0);
+      const mediaDb = await MediaHandler.openLocalMediaCacheDb();
+      if (options.includeMedia && mediaDb) {
+        await MediaHandler.gatherMediaFiles(mediaDb, cardsByType, cardTypes, options);
+      }
+      Progress.show("Sending cards to Anki...", 5);
+      const added = await ExportProcessor.pushToAnkiDirect(mediaDb, cardsByType, cardTypes, options, allCards.length);
+      Utils.setStatus(`Done! ${added} card(s) added to "${options.ankiTarget.deckName}"`, "#10b981");
+      Progress.set(100, "Complete");
+      Progress.hide();
+      return;
     }
 
     if (options.mergeSelected) {
@@ -3166,7 +3535,7 @@ const ExportProcessor = {
 
       AnkiBuilder.fillRevlogTable(ankiDb, reviews);
 
-      const modelMap = AnkiBuilder.insertCollectionMetadata(ankiDb, usedCardTypes, mappings, options.useTemplates);
+      const modelMap = AnkiBuilder.insertCollectionMetadata(ankiDb, usedCardTypes, mappings, options.useTemplates, options.ankiTarget || {});
       await ExportProcessor.fillNotesAndCards(ankiDb, mediaDb, zip, cardsByType, cardTypes, modelMap, options);
 
       const exported = ankiDb.export();
@@ -3193,12 +3562,26 @@ const ExportProcessor = {
         Progress.show(`Preparing ${deckName}`, 0);
 
       var allCards = DatabaseOps.listCardsForDeck(db, id).filter(x => !x.del);
+
+      if (allCards.length === 0) {
+        Utils.setStatus(`Deck "${deckName}" has 0 cards – skipping`, "#f59e0b");
+        Progress.hide();
+        continue;
+      }
+
+      Utils.setStatus(`Found ${allCards.length} card(s) in "${deckName}" – preparing export...`, "#f59e0b");
       var cardsByTypeIndividual = new Map();
 
       for (const c of allCards) {
         if(!cardsByTypeIndividual.has(c.cardTypeId)) cardsByTypeIndividual.set(c.cardTypeId, []);
         cardsByTypeIndividual.get(c.cardTypeId).push(c);
-      }        var individualCardTypes = Array.from(cardsByTypeIndividual.keys()).map(k => cardTypes.get(k));
+      }
+      var individualCardTypes = Array.from(cardsByTypeIndividual.keys()).map(k => cardTypes.get(k)).filter(Boolean);
+        if (individualCardTypes.length === 0) {
+          Utils.setStatus(`No card types found for "${deckName}" – skipping`, "#f59e0b");
+          Progress.hide();
+          continue;
+        }
         if (DeckProtection.checkForbiddenContent(individualCardTypes)) {
           var msg = DeckProtection.getForbiddenMessage();
           Utils.setStatus(msg, "#ef4444");
@@ -3232,7 +3615,7 @@ const ExportProcessor = {
         );
         AnkiBuilder.fillRevlogTable(ankiDb, reviews);
 
-        const modelMap = AnkiBuilder.insertCollectionMetadata(ankiDb, individualCardTypes, mappings, options.useTemplates);
+        const modelMap = AnkiBuilder.insertCollectionMetadata(ankiDb, individualCardTypes, mappings, options.useTemplates, options.ankiTarget || {});
         await ExportProcessor.fillNotesAndCards(ankiDb, mediaDb, zip, cardsByTypeIndividual, cardTypes, modelMap, options);
 
         const exported = ankiDb.export();
@@ -4482,6 +4865,34 @@ const UI = {
           </div>
         </div>
 
+        <div class="mgk-row" style="margin-top:12px;flex-direction:column;gap:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div class="mgk-small" style="font-weight:600;">Anki Target <span style="font-weight:400;opacity:0.6;">(optional – requires AnkiConnect plugin)</span></div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <span id="mgkAnkiConnectStatus" style="font-size:0.75rem;color:rgba(255,255,255,0.5);">Not connected</span>
+              <button id="mgkAnkiConnectBtn" class="UiButton -flat" type="button" style="padding:4px 12px;"><div class="UiButton__text"><span class="UiTypo UiTypo__buttonText">Connect to Anki</span></div></button>
+            </div>
+          </div>
+          <div style="display:flex;gap:12px;">
+            <div style="flex:1;">
+              <div class="mgk-small">Target deck in Anki</div>
+              <select id="mgkAnkiTargetDeck" class="mgk-language-select" style="width:100%;margin-top:4px;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--secondary-bg);color:var(--text);font-size:13px;cursor:pointer;">
+                <option value="">Use Migaku deck names</option>
+              </select>
+            </div>
+            <div style="flex:1;">
+              <div class="mgk-small">Note type in Anki</div>
+              <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
+                <select id="mgkAnkiTargetNoteType" class="mgk-language-select" style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--secondary-bg);color:var(--text);font-size:13px;cursor:pointer;">
+                  <option value="">Use Migaku note type</option>
+                </select>
+                <button id="mgkAnkiMapFieldsBtn" class="UiButton -flat" type="button" style="white-space:nowrap;flex-shrink:0;"><div class="UiButton__text"><span class="UiTypo UiTypo__buttonText">Map Fields</span></div></button>
+              </div>
+            </div>
+          </div>
+          <div id="mgkAnkiFieldMappingSection" style="display:none;"></div>
+        </div>
+
         <div id="mgkexporterStatusMessage" class="mgk-status">Ready</div>
       </div>
 
@@ -4832,13 +5243,8 @@ const UI = {
   },
 
   destroyUI: () => {
-    const fab = Utils.safeGetElement(CONFIG.FAB_ID);
     const fabMenu = Utils.safeGetElement("mgkFabMenu");
     const exportAction = Utils.safeGetElement("mgkExportToAnkiAction");
-
-    if (fab && fab.parentNode) {
-      fab.parentNode.removeChild(fab);
-    }
     if (fabMenu && fabMenu.parentNode) {
       fabMenu.parentNode.removeChild(fabMenu);
     }
@@ -5253,6 +5659,23 @@ async function initializeMigakuExporter() {
       Utils.setStatus("Starting export(s)...", "#f59e0b");
       Progress.show("Starting...", 0);
 
+      // Read AnkiConnect target selections
+      const deckSelEl = Utils.safeGetElement("mgkAnkiTargetDeck");
+      const noteTypeSelEl = Utils.safeGetElement("mgkAnkiTargetNoteType");
+      const targetDeckName = deckSelEl?.value || "";
+      const noteTypeRaw = noteTypeSelEl?.value || "";
+      const savedAnkiTarget = Storage.loadAnkiTarget();
+      opts.ankiTarget = {};
+      if (targetDeckName) opts.ankiTarget.deckName = targetDeckName;
+      if (savedAnkiTarget.fieldMapping) opts.ankiTarget.fieldMapping = savedAnkiTarget.fieldMapping;
+      if (noteTypeRaw) {
+        try {
+          const nt = JSON.parse(noteTypeRaw);
+          try { nt.fields = await AnkiConnect.getFieldNames(nt.name); } catch {}
+          opts.ankiTarget.noteType = nt;
+        } catch {}
+      }
+
       const mappings = Storage.loadMappings();
       try {
         await ExportProcessor.buildApkgsForSelection(
@@ -5270,6 +5693,52 @@ async function initializeMigakuExporter() {
       }
       Progress.hide();
     });
+
+    // AnkiConnect button wiring
+    Utils.safeAddListener(Utils.safeGetElement("mgkAnkiConnectBtn"), "click", async () => {
+      const statusEl = Utils.safeGetElement("mgkAnkiConnectStatus");
+      const deckSel = Utils.safeGetElement("mgkAnkiTargetDeck");
+      const noteTypeSel = Utils.safeGetElement("mgkAnkiTargetNoteType");
+      if (statusEl) { statusEl.textContent = "Connecting..."; statusEl.style.color = "#f59e0b"; }
+      try {
+        const connected = await AnkiConnect.testConnection();
+        if (!connected) throw new Error("No response");
+        const [decks, noteTypes] = await Promise.all([
+          AnkiConnect.getDeckNames(),
+          AnkiConnect.getNoteTypeNamesAndIds()
+        ]);
+        const saved = Storage.loadAnkiTarget();
+        deckSel.innerHTML = '<option value="">Use Migaku deck names</option>';
+        decks.sort().forEach(name => {
+          const opt = document.createElement("option");
+          opt.value = name; opt.textContent = name;
+          if (saved.deckName === name) opt.selected = true;
+          deckSel.appendChild(opt);
+        });
+        noteTypeSel.innerHTML = '<option value="">Use Migaku note type</option>';
+        Object.entries(noteTypes).sort(([a],[b]) => a.localeCompare(b)).forEach(([name, id]) => {
+          const opt = document.createElement("option");
+          opt.value = JSON.stringify({ name, id: Number(id) }); opt.textContent = name;
+          if (saved.noteTypeName === name) opt.selected = true;
+          noteTypeSel.appendChild(opt);
+        });
+        if (statusEl) { statusEl.textContent = `Connected (${decks.length} decks, ${Object.keys(noteTypes).length} note types)`; statusEl.style.color = "#10b981"; }
+        Storage.saveAnkiTarget({ deckName: deckSel.value, noteTypeName: noteTypeSel.value ? JSON.parse(noteTypeSel.value).name : "" });
+      } catch (e) {
+        if (statusEl) { statusEl.textContent = "Failed – open Anki with AnkiConnect installed"; statusEl.style.color = "#ef4444"; }
+        Utils.log("AnkiConnect error:", e);
+      }
+    });
+    Utils.safeAddListener(Utils.safeGetElement("mgkAnkiTargetDeck"), "change", () => {
+      const v = Utils.safeGetElement("mgkAnkiTargetDeck")?.value || "";
+      const cur = Storage.loadAnkiTarget(); Storage.saveAnkiTarget({ ...cur, deckName: v });
+    });
+    Utils.safeAddListener(Utils.safeGetElement("mgkAnkiTargetNoteType"), "change", () => {
+      const v = Utils.safeGetElement("mgkAnkiTargetNoteType")?.value || "";
+      const cur = Storage.loadAnkiTarget();
+      Storage.saveAnkiTarget({ ...cur, noteTypeName: v ? JSON.parse(v).name : "", fieldMapping: null });
+    });
+    Utils.safeAddListener(Utils.safeGetElement("mgkAnkiMapFieldsBtn"), "click", () => MappingModal.open());
 
     Utils.safeAddListener(Utils.safeGetElement("mgkExportWordlistBtn"), "click", async () => {
       // First check language filter dropdown
@@ -5348,6 +5817,20 @@ window.migakuExporterV3 = {
   });
 
   window.migakuExporter = window.migakuExporterV3;
+
+  // Inject persistent FAB button immediately - lives outside route management so it never gets destroyed
+  function ensureFab() {
+    if (Utils.safeGetElement(CONFIG.FAB_ID)) return;
+    UI.injectStyles();
+    const fab = document.createElement("button");
+    fab.id = CONFIG.FAB_ID;
+    fab.className = "mgk-fab";
+    fab.title = "Migaku \u2192 Anki Exporter";
+    fab.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" width="26" height="26" role="img"><path fill="currentColor" fill-rule="evenodd" d="M19.61 3.573c-.265-1.984-2.793-2.662-4.014-1.076l-.38.493-.611-.112c-1.969-.362-3.395 1.834-2.263 3.485l.351.513-.296.547c-.952 1.76.695 3.795 2.615 3.229l.597-.176.429.45c1.38 1.45 3.823.512 3.879-1.488l.017-.622.561-.269c1.805-.864 1.668-3.478-.217-4.149l-.587-.209zm-2.4.926.104.777c.062.465.378.856.82 1.013l.74.263-.708.339a1.25 1.25 0 0 0-.71 1.093l-.022.784-.54-.568a1.25 1.25 0 0 0-1.26-.338l-.752.222.373-.69a1.25 1.25 0 0 0-.068-1.301l-.443-.648.771.142a1.25 1.25 0 0 0 1.217-.467zM10.092 10.048c-1.015-1.725-3.608-1.365-4.115.571l-.513 1.955-1.973.437c-1.954.432-2.414 3.01-.73 4.09l1.702 1.092-.194 2.012c-.193 1.992 2.116 3.225 3.665 1.957l1.563-1.28 1.854.806c1.835.799 3.721-1.016 2.994-2.88l-.735-1.884 1.34-1.513c1.326-1.499.183-3.854-1.815-3.738l-2.018.117zm-1.85 1.786 1.108 1.882c.238.404.682.641 1.15.614l2.18-.126-1.448 1.635a1.25 1.25 0 0 0-.229 1.283l.794 2.034-2.002-.872a1.25 1.25 0 0 0-1.29.18l-1.69 1.383.21-2.174a1.25 1.25 0 0 0-.57-1.172l-1.837-1.18 2.132-.471c.458-.101.82-.45.939-.903z" clip-rule="evenodd"></path></svg>`;
+    fab.addEventListener("click", () => UI.showMainModal());
+    document.body.appendChild(fab);
+  }
+  ensureFab();
 
   // Start the memory + menu observer immediately, no need to wait for DB
   UI.ensureMemoryPlusIntegration();
