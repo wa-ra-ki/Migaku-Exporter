@@ -31,29 +31,48 @@ const CONFIG = {
   CHAT_API_KEY_STORAGE: "migaku_gpt_api_key",
 
   MIGAKU_FIELDS: [
-    'Word', 'Sentence', 'Translated Sentence', 'Definitions',
-    'Example Sentences', 'Notes', 'Images', 'Sentence Audio', 'Word Audio'
+    "Word",
+    "Sentence",
+    "Translated Sentence",
+    "Definitions",
+    "Example Sentences",
+    "Notes",
+    "Images",
+    "Sentence Audio",
+    "Word Audio",
   ],
 
   FORBIDDEN_PATTERNS: /\b(migaku|academy|fundamentals|course|lesson)\b/i,
 
   PRESETS: {
-    "smaller": {
-      imageMaxDimension: 800, imageQuality: 0.7, audioSampleRate: 16000,
-      maxMediaSizeMB: 3, enableImageConversion: true, enableAudioConversion: true,
-      label: "Smaller file size"
+    smaller: {
+      imageMaxDimension: 800,
+      imageQuality: 0.7,
+      audioSampleRate: 16000,
+      maxMediaSizeMB: 3,
+      enableImageConversion: true,
+      enableAudioConversion: true,
+      label: "Smaller file size",
     },
-    "normal": {
-      imageMaxDimension: 1024, imageQuality: 0.85, audioSampleRate: 22050,
-      maxMediaSizeMB: 10, enableImageConversion: true, enableAudioConversion: true,
-      label: "Normal"
+    normal: {
+      imageMaxDimension: 1024,
+      imageQuality: 0.85,
+      audioSampleRate: 22050,
+      maxMediaSizeMB: 10,
+      enableImageConversion: true,
+      enableAudioConversion: true,
+      label: "Normal",
     },
-    "better": {
-      imageMaxDimension: 2048, imageQuality: 0.95, audioSampleRate: 44100,
-      maxMediaSizeMB: 50, enableImageConversion: false, enableAudioConversion: false,
-      label: "Better quality"
-    }
-  }
+    better: {
+      imageMaxDimension: 2048,
+      imageQuality: 0.95,
+      audioSampleRate: 44100,
+      maxMediaSizeMB: 50,
+      enableImageConversion: false,
+      enableAudioConversion: false,
+      label: "Better quality",
+    },
+  },
 };
 
 const Utils = {
@@ -64,7 +83,7 @@ const Utils = {
       const el = document.getElementById(CONFIG.STATUS_ELEMENT_ID);
       if (el) {
         el.innerText = text;
-        if(color) el.style.color = color;
+        if (color) el.style.color = color;
       }
       Utils.log(text);
     } catch (error) {
@@ -75,8 +94,8 @@ const Utils = {
 
   safeGetElement: (id) => {
     try {
-      const element =  document.getElementById(id);
-      if(element === null) {
+      const element = document.getElementById(id);
+      if (element === null) {
         console.warn(`[MGK] Element not found: ${id}`);
         return null;
       }
@@ -91,12 +110,12 @@ const Utils = {
     try {
       if (!elOrSelector) return;
       let el = elOrSelector;
-      if(typeof el === "string") el = document.querySelector(el);
+      if (typeof el === "string") el = document.querySelector(el);
       if (!el) return;
 
-      if(typeof el.addEventListener === "function") {
+      if (typeof el.addEventListener === "function") {
         el.addEventListener(eventName, handler, options);
-      } else if(typeof el.onclick === "undefined" && eventName === "click"){
+      } else if (typeof el.onclick === "undefined" && eventName === "click") {
         // fallback for older browsers
         el.onclick = handler;
       }
@@ -107,29 +126,33 @@ const Utils = {
 
   // https://stackoverflow.com/a/2117523
   createUUID: () => {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-      var r = Math.random() * 16 | 0;
-      var v = c === 'x' ? r : (r & 0x3 | 0x8);
-      return v.toString(16);
-    });
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(
+      /[xy]/g,
+      function (c) {
+        var r = (Math.random() * 16) | 0;
+        var v = c === "x" ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+      }
+    );
   },
 
-  sleep: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
+  sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
 
   formatBytes: (bytes) => {
-    if(bytes === 0) return '0 B';
+    if (bytes === 0) return "0 B";
     const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const sizes = ["B", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  }
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  },
 };
-
 
 const Storage = {
   saveSettings: (obj) => {
     try {
-      let current = JSON.parse(localStorage.getItem(CONFIG.SETTINGS_STORAGE_KEY) || "{}");
+      let current = JSON.parse(
+        localStorage.getItem(CONFIG.SETTINGS_STORAGE_KEY) || "{}"
+      );
       let merged = { ...current, ...obj };
       localStorage.setItem(CONFIG.SETTINGS_STORAGE_KEY, JSON.stringify(merged));
     } catch (error) {
@@ -138,7 +161,9 @@ const Storage = {
   },
 
   loadSettings: () => {
-    return JSON.parse(localStorage.getItem(CONFIG.SETTINGS_STORAGE_KEY) || "{}");
+    return JSON.parse(
+      localStorage.getItem(CONFIG.SETTINGS_STORAGE_KEY) || "{}"
+    );
   },
 
   saveMappings: (map) => {
@@ -147,7 +172,9 @@ const Storage = {
 
   loadMappings: () => {
     try {
-      return JSON.parse(localStorage.getItem(CONFIG.MAPPING_STORAGE_KEY) || "{}");
+      return JSON.parse(
+        localStorage.getItem(CONFIG.MAPPING_STORAGE_KEY) || "{}"
+      );
     } catch (e) {
       return {};
     }
@@ -159,15 +186,17 @@ const Storage = {
 
   loadApiKey: () => {
     return localStorage.getItem(CONFIG.CHAT_API_KEY_STORAGE) || "";
-  }
+  },
 };
 
 // Progress UI
 const Progress = {
   ensureUI: () => {
-    if(document.getElementById("mgkProgressContainer")) return;
-    const container = Utils.safeGetElement(CONFIG.MODAL_ID)?.querySelector(".mgk-controls");
-    if(!container) return;
+    if (document.getElementById("mgkProgressContainer")) return;
+    const container = Utils.safeGetElement(CONFIG.MODAL_ID)?.querySelector(
+      ".mgk-controls"
+    );
+    if (!container) return;
 
     const wrap = document.createElement("div");
     wrap.id = "mgkProgressContainer";
@@ -187,13 +216,13 @@ const Progress = {
   show: (label = "Starting...", percent = 0) => {
     Progress.ensureUI();
     var container = Utils.safeGetElement("mgkProgressContainer");
-    if(container) container.style.display = "block";
+    if (container) container.style.display = "block";
     Progress.set(percent, label);
   },
 
   hide: () => {
     var container = Utils.safeGetElement("mgkProgressContainer");
-    if(container) container.style.display = "none";
+    if (container) container.style.display = "none";
     Progress.set(0, "Idle");
   },
 
@@ -203,11 +232,11 @@ const Progress = {
     var labelEl = Utils.safeGetElement("mgkProgressLabel");
     var pctEl = Utils.safeGetElement("mgkProgressPercent");
 
-    if(bar) bar.style.width = `${Math.max(0, Math.min(100, percent))}%`;
-    if(labelEl) labelEl.innerText = label || "";
-    if(pctEl) pctEl.innerText = `${Math.round(percent)}%`;
-    if(label) Utils.setStatus(label);
-  }
+    if (bar) bar.style.width = `${Math.max(0, Math.min(100, percent))}%`;
+    if (labelEl) labelEl.innerText = label || "";
+    if (pctEl) pctEl.innerText = `${Math.round(percent)}%`;
+    if (label) Utils.setStatus(label);
+  },
 };
 
 // media processing functions
@@ -220,16 +249,16 @@ const MediaProcessor = {
     let chunks = [];
     let totalSize = 0;
 
-    while(true) {
+    while (true) {
       const { value, done } = await reader.read();
-      if(done) break;
+      if (done) break;
       chunks.push(value);
       totalSize += value.byteLength;
     }
 
     let out = new Uint8Array(totalSize);
     let offset = 0;
-    for(const chunk of chunks) {
+    for (const chunk of chunks) {
       out.set(chunk, offset);
       offset += chunk.byteLength;
     }
@@ -240,7 +269,8 @@ const MediaProcessor = {
     return new Promise((resolve) => {
       var img = new Image();
       img.onload = async () => {
-        let w = img.naturalWidth, h = img.naturalHeight;
+        let w = img.naturalWidth,
+          h = img.naturalHeight;
         var scale = Math.min(1, maxDim / Math.max(w, h));
         w = Math.round(w * scale);
         h = Math.round(h * scale);
@@ -261,13 +291,13 @@ const MediaProcessor = {
 // firebase auth to get media from migaku's servers
 const FirebaseAuth = {
   getFirebaseLocalStorageRows() {
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       var req = indexedDB.open("firebaseLocalStorageDb", 1);
       req.onsuccess = () => {
         var idb = req.result;
         var tx = idb.transaction("firebaseLocalStorage", "readonly");
         var store = tx.objectStore("firebaseLocalStorage");
-        store.getAll().onsuccess = ev => resolve(ev.target.result);
+        store.getAll().onsuccess = (ev) => resolve(ev.target.result);
         idb.close();
       };
       req.onerror = () => resolve([]);
@@ -280,15 +310,15 @@ const FirebaseAuth = {
       method: "POST",
       body: new URLSearchParams({
         grant_type: "refresh_token",
-        refresh_token: refreshToken
-      })
+        refresh_token: refreshToken,
+      }),
     });
     return await resp.json();
   },
 
   async getAccessToken() {
     var rows = await FirebaseAuth.getFirebaseLocalStorageRows();
-    if(!rows || rows.length === 0) {
+    if (!rows || rows.length === 0) {
       throw new Error("Firebase info missing (can't fetch media).");
     }
 
@@ -299,7 +329,7 @@ const FirebaseAuth = {
     );
     var expiresAt = Date.now() + (Number(tokenResp.expires_in) - 5) * 1000;
     return { token: tokenResp.access_token, expiresAt };
-  }
+  },
 };
 
 // database query helpers
@@ -308,15 +338,15 @@ const DatabaseOps = {
   loadRawSrsDatabaseBlob() {
     return new Promise((resolve) => {
       var dbRequest = indexedDB.open("srs", 1);
-      dbRequest.onsuccess = function() {
+      dbRequest.onsuccess = function () {
         var idb = dbRequest.result;
         var transaction = idb.transaction("data", "readonly");
         var objectStore = transaction.objectStore("data");
         var cursorRequest = objectStore.openCursor();
 
-        cursorRequest.onsuccess = async function() {
+        cursorRequest.onsuccess = async function () {
           var cursor = cursorRequest.result;
-          if(cursor) {
+          if (cursor) {
             try {
               var data = cursor.value.data;
               var blob = new Blob([data], { type: "application/octet-stream" });
@@ -329,14 +359,20 @@ const DatabaseOps = {
           } else {
             resolve(null);
           }
-          try { idb.close(); } catch (e) {}
+          try {
+            idb.close();
+          } catch (e) {}
         };
-        cursorRequest.onerror = function() {
+        cursorRequest.onerror = function () {
           resolve(null);
-          try { idb.close(); } catch (e) {}
+          try {
+            idb.close();
+          } catch (e) {}
         };
       };
-      dbRequest.onerror = function () { resolve(null); };
+      dbRequest.onerror = function () {
+        resolve(null);
+      };
     });
   },
 
@@ -344,7 +380,7 @@ const DatabaseOps = {
     const row = {};
     for (let i = 0; i < columnNames.length; i++) {
       const col = columnNames[i];
-      row[col] = (col === "del") ? (rowVals[i] !== 0) : rowVals[i];
+      row[col] = col === "del" ? rowVals[i] !== 0 : rowVals[i];
     }
     return row;
   },
@@ -368,31 +404,40 @@ const DatabaseOps = {
   },
 
   listDecks(db) {
-    return DatabaseOps.runQueryToObjects(db, "SELECT id, lang, name, del FROM deck;");
+    return DatabaseOps.runQueryToObjects(
+      db,
+      "SELECT id, lang, name, del FROM deck;"
+    );
   },
 
   listCardsForDeck(db, deckId) {
-    return DatabaseOps.runQueryToObjects(db,
+    return DatabaseOps.runQueryToObjects(
+      db,
       "SELECT id, mod, del, cardTypeId, created, primaryField, secondaryField, fields, words, due, interval, factor, lastReview, reviewCount, passCount, failCount, suspended FROM card WHERE deckId=?",
       [deckId]
     );
   },
 
   listReviewHistory(db) {
-    return DatabaseOps.runQueryToObjects(db,
+    return DatabaseOps.runQueryToObjects(
+      db,
       "SELECT id, mod, del, day, interval, factor, cardId, duration, type, lapseIndex FROM review"
     );
   },
 
   listWordListForLanguage(db, lang) {
-    return DatabaseOps.runQueryToObjects(db,
+    return DatabaseOps.runQueryToObjects(
+      db,
       "SELECT dictForm, secondary, partOfSpeech, language, mod, serverMod, del, knownStatus, hasCard, tracked FROM WordList WHERE language=?",
       [lang]
     );
   },
 
   readCardTypes(db) {
-    var rows = DatabaseOps.runQueryToObjects(db, "SELECT id, del, lang, name, config FROM card_type");
+    var rows = DatabaseOps.runQueryToObjects(
+      db,
+      "SELECT id, del, lang, name, config FROM card_type"
+    );
     var map = new Map();
 
     for (const r of rows) {
@@ -407,8 +452,8 @@ const DatabaseOps = {
         r.config.fields = [{ name: "Field1", type: "TEXT" }];
       } else {
         r.config.fields = r.config.fields.map((f, i) => ({
-          name: f?.name || `Field${i+1}`,
-          type: f?.type || "TEXT"
+          name: f?.name || `Field${i + 1}`,
+          type: f?.type || "TEXT",
         }));
       }
       map.set(r.id, r);
@@ -421,29 +466,35 @@ const DatabaseOps = {
       var decks = DatabaseOps.listDecks(db);
       var allCards = [];
 
-      for (const deck of decks.filter(d => !d.del)) {
+      for (const deck of decks.filter((d) => !d.del)) {
         var cards = DatabaseOps.listCardsForDeck(db, deck.id);
-        allCards.push(...cards.map(card => ({ ...card, deckName: deck.name, deckLang: deck.lang })));
+        allCards.push(
+          ...cards.map((card) => ({
+            ...card,
+            deckName: deck.name,
+            deckLang: deck.lang,
+          }))
+        );
       }
 
-      var languages = [...new Set(decks.map(d => d.lang).filter(Boolean))];
+      var languages = [...new Set(decks.map((d) => d.lang).filter(Boolean))];
       const wordLists = {};
 
-      for(const lang of languages) {
+      for (const lang of languages) {
         wordLists[lang] = DatabaseOps.listWordListForLanguage(db, lang);
       }
 
       return {
-        decks: decks.filter(d => !d.del),
-        cards: allCards.filter(c => !c.del),
+        decks: decks.filter((d) => !d.del),
+        cards: allCards.filter((c) => !c.del),
         wordLists,
-        cardTypes: Array.from(DatabaseOps.readCardTypes(db).values())
+        cardTypes: Array.from(DatabaseOps.readCardTypes(db).values()),
       };
     } catch (error) {
       console.error("Failed to get user learning data:", error);
       return { decks: [], cards: [], wordLists: {}, cardTypes: [] };
     }
-  }
+  },
 };
 
 // field name mapping
@@ -452,8 +503,12 @@ const FieldMapper = {
     var mappings = Storage.loadMappings();
     var globalMapping = mappings["__global__"] || mappings.__global;
 
-    if(globalMapping && globalMapping.fields && Array.isArray(globalMapping.fields)) {
-      return globalMapping.fields.map(f => f.ankiName || f.migakuName);
+    if (
+      globalMapping &&
+      globalMapping.fields &&
+      Array.isArray(globalMapping.fields)
+    ) {
+      return globalMapping.fields.map((f) => f.ankiName || f.migakuName);
     }
 
     return CONFIG.MIGAKU_FIELDS;
@@ -463,48 +518,51 @@ const FieldMapper = {
     var rawFields = [
       card.primaryField || "",
       card.secondaryField || "",
-      ...(card.fields ? card.fields.split("\u001f") : [])
+      ...(card.fields ? card.fields.split("\u001f") : []),
     ];
 
     var fieldNames = FieldMapper.getFieldNames();
-    var defFields = (cardType && cardType.config && Array.isArray(cardType.config.fields))
-      ? cardType.config.fields
-      : [];
+    var defFields =
+      cardType && cardType.config && Array.isArray(cardType.config.fields)
+        ? cardType.config.fields
+        : [];
     var processedFields = [];
 
-    for(let i = 0; i < fieldNames.length; i++) {
+    for (let i = 0; i < fieldNames.length; i++) {
       var fieldName = fieldNames[i];
       var rawValue = rawFields[i] || "";
       var defType = String(defFields[i]?.type || "").toUpperCase();
       var isImageField = defType === "IMAGE";
       var isAudioField = defType === "AUDIO" || defType === "AUDIO_LONG";
 
-      if(isImageField && settings.includeImages && rawValue) {
+      if (isImageField && settings.includeImages && rawValue) {
         var imageRefs = MediaHandler.extractMediaPaths(rawValue);
-        if(imageRefs.length === 0) imageRefs = [rawValue];
+        if (imageRefs.length === 0) imageRefs = [rawValue];
 
         var imageTags = [];
-        for(const ref of imageRefs) {
+        for (const ref of imageRefs) {
           var mediaName = await ensureMediaInZip(ref);
-          if(mediaName) imageTags.push(`<img src="${mediaName}">`);
+          if (mediaName) imageTags.push(`<img src="${mediaName}">`);
         }
 
         processedFields.push(imageTags.join("<br>"));
-      } else if(isAudioField && settings.includeAudio && rawValue) {
+      } else if (isAudioField && settings.includeAudio && rawValue) {
         var audioRefs = MediaHandler.extractMediaPaths(rawValue);
-        if(audioRefs.length === 0) audioRefs = [rawValue];
+        if (audioRefs.length === 0) audioRefs = [rawValue];
 
         var soundTags = [];
-        for(const ref of audioRefs) {
+        for (const ref of audioRefs) {
           var mediaName = await ensureMediaInZip(ref);
-          if(mediaName) soundTags.push(`[sound:${mediaName}]`);
+          if (mediaName) soundTags.push(`[sound:${mediaName}]`);
         }
 
         processedFields.push(soundTags.join(" "));
       } else {
-        if(!settings.keepSyntax && rawValue) {
+        if (!settings.keepSyntax && rawValue) {
           // strip out migaku's bracket syntax
-          rawValue = rawValue.replaceAll(/\[.*?\]/g, "").replaceAll(/[{}]/g, "");
+          rawValue = rawValue
+            .replaceAll(/\[.*?\]/g, "")
+            .replaceAll(/[{}]/g, "");
         }
         processedFields.push(rawValue);
       }
@@ -517,17 +575,19 @@ const FieldMapper = {
 // protect against exporting academy courses (migaku doesn't want these redistributed)
 const DeckProtection = {
   checkForbiddenContent: (cardTypes) => {
-    return cardTypes.some(ct => {
-      var name = (ct && ct.name) ? String(ct.name) : '';
+    return cardTypes.some((ct) => {
+      var name = ct && ct.name ? String(ct.name) : "";
       return CONFIG.FORBIDDEN_PATTERNS.test(name);
     });
   },
 
   getForbiddenMessage: () => {
-    return 'Migaku Academy/Fundamentals Course Content is not allowed to be exported! ' +
-           'If you are not exporting a Migaku course and see this error message, ' +
-           'please report it at: https://github.com/wa-ra-ki/Migaku-Exporter/issues';
-  }
+    return (
+      "Migaku Academy/Fundamentals Course Content is not allowed to be exported! " +
+      "If you are not exporting a Migaku course and see this error message, " +
+      "please report it at: https://github.com/wa-ra-ki/Migaku-Exporter/issues"
+    );
+  },
 };
 
 // anki db creation
@@ -553,26 +613,35 @@ const AnkiBuilder = {
 
   insertCollectionMetadata(db, usedCardTypes, mappings, useTemplates) {
     var mapping = new Map();
-    for(const ct of usedCardTypes) {
-      mapping.set(ct.id, Number(String(Date.now()).slice(0,10) + String(ct.id)));
+    for (const ct of usedCardTypes) {
+      mapping.set(
+        ct.id,
+        Number(String(Date.now()).slice(0, 10) + String(ct.id))
+      );
     }
 
     var conf = {
       curDeck: 1,
-      curModel: mapping.get(usedCardTypes[0].id).toString()
+      curModel: mapping.get(usedCardTypes[0].id).toString(),
     };
 
     var models = {};
-    for(const ct of usedCardTypes) {
+    for (const ct of usedCardTypes) {
       var fields = [];
 
       const fieldNames = FieldMapper.getFieldNames();
-      const pushField = (name) => fields.push({
-        font: "Arial", media: [], name, ord: fields.length,
-        rtl: false, size: 20, sticky: false
-      });
+      const pushField = (name) =>
+        fields.push({
+          font: "Arial",
+          media: [],
+          name,
+          ord: fields.length,
+          rtl: false,
+          size: 20,
+          sticky: false,
+        });
 
-      fieldNames.forEach(fieldName => pushField(fieldName));
+      fieldNames.forEach((fieldName) => pushField(fieldName));
 
       // try to create better templates based on card type
       let template;
@@ -585,9 +654,12 @@ const AnkiBuilder = {
               qfmt: `{{${fields[0].name}}}<br>{{${fields[1].name}}}`,
               did: null,
               bafmt: "",
-              afmt: `{{FrontSide}}<hr id="answer"><br>${fields.slice(0,5).map(f=>`{{${f.name}}}<br>`).join("")}`,
+              afmt: `{{FrontSide}}<hr id="answer"><br>${fields
+                .slice(0, 5)
+                .map((f) => `{{${f.name}}}<br>`)
+                .join("")}`,
               ord: 0,
-              bqfmt: ""
+              bqfmt: "",
             };
           } else {
             template = {
@@ -595,9 +667,12 @@ const AnkiBuilder = {
               qfmt: `{{${fields[0].name}}}`,
               did: null,
               bafmt: "",
-              afmt: `{{FrontSide}}<hr id="answer"><br>${fields.slice(1).map(f=>`{{${f.name}}}`).join("<br>")}`,
+              afmt: `{{FrontSide}}<hr id="answer"><br>${fields
+                .slice(1)
+                .map((f) => `{{${f.name}}}`)
+                .join("<br>")}`,
               ord: 0,
-              bqfmt: ""
+              bqfmt: "",
             };
           }
         } else {
@@ -606,9 +681,12 @@ const AnkiBuilder = {
             qfmt: `{{${fields[0].name}}}`,
             did: null,
             bafmt: "",
-            afmt: `{{FrontSide}}<hr id="answer"><br>${fields.slice(1).map(f=>`{{${f.name}}}`).join("<br>")}`,
+            afmt: `{{FrontSide}}<hr id="answer"><br>${fields
+              .slice(1)
+              .map((f) => `{{${f.name}}}`)
+              .join("<br>")}`,
             ord: 0,
-            bqfmt: ""
+            bqfmt: "",
           };
         }
       } catch {
@@ -621,7 +699,7 @@ const AnkiBuilder = {
           bafmt: "",
           afmt: `{{FrontSide}}<hr id='answer'><br>{{${secondFieldName}}}`,
           ord: 0,
-          bqfmt: ""
+          bqfmt: "",
         };
       }
 
@@ -640,34 +718,82 @@ const AnkiBuilder = {
         tmpls: [template],
         type: 0,
         usn: -1,
-        vers: []
+        vers: [],
       };
     }
 
     const decks = {
       1: {
-        name: "Default", extendRev: 10, usn: -1, collapsed: false, browserCollapsed: false,
-        newToday: [0,0], revToday: [0,0], lrnToday: [0,0], timeToday: [0,0],
-        dyn: 0, extendNew: 10, conf: 1, id: 1, mod: Date.now(), desc: ""
-      }
+        name: "Default",
+        extendRev: 10,
+        usn: -1,
+        collapsed: false,
+        browserCollapsed: false,
+        newToday: [0, 0],
+        revToday: [0, 0],
+        lrnToday: [0, 0],
+        timeToday: [0, 0],
+        dyn: 0,
+        extendNew: 10,
+        conf: 1,
+        id: 1,
+        mod: Date.now(),
+        desc: "",
+      },
     };
 
     const dconf = {
       1: {
-        autoplay: false, id: 1,
-        lapse: {delays: [10], leechAction: 0, leechFails: 8, minInt: 1, mult: 0},
-        maxTaken: 60, mod: 0, name: "Default",
-        new: {bury: true, delays: [1,10], initialFactor: 2500, ints: [1,4,7], order: 1, perDay: 20, separate: true},
+        autoplay: false,
+        id: 1,
+        lapse: {
+          delays: [10],
+          leechAction: 0,
+          leechFails: 8,
+          minInt: 1,
+          mult: 0,
+        },
+        maxTaken: 60,
+        mod: 0,
+        name: "Default",
+        new: {
+          bury: true,
+          delays: [1, 10],
+          initialFactor: 2500,
+          ints: [1, 4, 7],
+          order: 1,
+          perDay: 20,
+          separate: true,
+        },
         replayq: true,
-        rev: {bury: true, ease4: 1.3, fuzz: 0.05, ivlFct: 1, maxIvl: 36500, minSpace: 1, perDay: 100},
-        timer: 0, usn: -1
-      }
+        rev: {
+          bury: true,
+          ease4: 1.3,
+          fuzz: 0.05,
+          ivlFct: 1,
+          maxIvl: 36500,
+          minSpace: 1,
+          perDay: 100,
+        },
+        timer: 0,
+        usn: -1,
+      },
     };
 
     db.run("INSERT INTO col VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
-      1, Math.floor(Date.now()/1000), Date.now(), Date.now(), 11, 0, 0, Date.now(),
-      JSON.stringify(conf), JSON.stringify(models), JSON.stringify(decks),
-      JSON.stringify(dconf), "{}"
+      1,
+      Math.floor(Date.now() / 1000),
+      Date.now(),
+      Date.now(),
+      11,
+      0,
+      0,
+      Date.now(),
+      JSON.stringify(conf),
+      JSON.stringify(models),
+      JSON.stringify(decks),
+      JSON.stringify(dconf),
+      "{}",
     ]);
 
     return mapping;
@@ -675,7 +801,7 @@ const AnkiBuilder = {
 
   fillRevlogTable(db, reviews) {
     var revIntervals = new Map();
-    reviews.sort((a,b) => a.mod - b.mod);
+    reviews.sort((a, b) => a.mod - b.mod);
 
     // migaku counts distinct cardId per day/type, so dedupe
     var uniqueKey = new Set();
@@ -690,7 +816,9 @@ const AnkiBuilder = {
       }
     }
 
-    Utils.log(`fillRevlogTable: ${reviews.length} reviews → ${uniqueReviews.length} unique`);
+    Utils.log(
+      `fillRevlogTable: ${reviews.length} reviews → ${uniqueReviews.length} unique`
+    );
     var insertedByType = { 0: 0, 1: 0, 2: 0 };
 
     // make sure review IDs are unique
@@ -719,9 +847,15 @@ const AnkiBuilder = {
       const currentInterval = Math.round(r.interval);
 
       db.run("INSERT INTO revlog VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", [
-        reviewId, r.cardId, -1, ease, currentInterval, prevIvl,
-        Math.floor(r.factor * 1000), Math.min(r.duration, 60) * 1000,
-        r.type === 0 ? 0 : 1
+        reviewId,
+        r.cardId,
+        -1,
+        ease,
+        currentInterval,
+        prevIvl,
+        Math.floor(r.factor * 1000),
+        Math.min(r.duration, 60) * 1000,
+        r.type === 0 ? 0 : 1,
       ]);
       revIntervals.set(r.cardId, currentInterval);
     }
@@ -730,8 +864,10 @@ const AnkiBuilder = {
     if (reviewIdCounter > 0) {
       Utils.log(`Fixed ${reviewIdCounter} duplicate review IDs`);
     }
-    Utils.log(`Revlog insert - New(0): ${insertedByType[0]}, Fail(1): ${insertedByType[1]}, Pass(2): ${insertedByType[2]}`);
-  }
+    Utils.log(
+      `Revlog insert - New(0): ${insertedByType[0]}, Fail(1): ${insertedByType[1]}, Pass(2): ${insertedByType[2]}`
+    );
+  },
 };
 
 // GPT chat feature
@@ -750,7 +886,9 @@ const MigakuGPT = {
 
   loadApprovedResources: async () => {
     try {
-      const response = await fetch('https://raw.githubusercontent.com/wa-ra-ki/Migaku-Exporter/main/Approved-Links/japanese_videos_batch.json');
+      const response = await fetch(
+        "https://raw.githubusercontent.com/wa-ra-ki/Migaku-Exporter/main/Approved-Links/japanese_videos_batch.json"
+      );
       if (response.ok) {
         MigakuGPT.approvedResources = await response.json();
         Utils.log("Loaded approved resources for MigakuGPT");
@@ -1329,14 +1467,14 @@ const MigakuGPT = {
     const resizeHandle = Utils.safeGetElement("mgkResizeHandle");
 
     Utils.safeAddListener(header, "mousedown", (e) => {
-      if (e.target.closest('.mgk-chat-controls')) return;
+      if (e.target.closest(".mgk-chat-controls")) return;
 
       MigakuGPT.currentDragData = {
         isDragging: true,
         startX: e.clientX,
         startY: e.clientY,
         initialX: chatModal.offsetLeft,
-        initialY: chatModal.offsetTop
+        initialY: chatModal.offsetTop,
       };
 
       header.style.cursor = "grabbing";
@@ -1345,16 +1483,30 @@ const MigakuGPT = {
     });
 
     Utils.safeAddListener(document, "mousemove", (e) => {
-      if (!MigakuGPT.currentDragData?.isDragging && !MigakuGPT.currentResizeData?.isResizing) return;
+      if (
+        !MigakuGPT.currentDragData?.isDragging &&
+        !MigakuGPT.currentResizeData?.isResizing
+      )
+        return;
 
       if (MigakuGPT.currentDragData?.isDragging) {
         const deltaX = e.clientX - MigakuGPT.currentDragData.startX;
         const deltaY = e.clientY - MigakuGPT.currentDragData.startY;
 
-        const newX = Math.max(0, Math.min(window.innerWidth - chatModal.offsetWidth,
-          MigakuGPT.currentDragData.initialX + deltaX));
-        const newY = Math.max(0, Math.min(window.innerHeight - chatModal.offsetHeight,
-          MigakuGPT.currentDragData.initialY + deltaY));
+        const newX = Math.max(
+          0,
+          Math.min(
+            window.innerWidth - chatModal.offsetWidth,
+            MigakuGPT.currentDragData.initialX + deltaX
+          )
+        );
+        const newY = Math.max(
+          0,
+          Math.min(
+            window.innerHeight - chatModal.offsetHeight,
+            MigakuGPT.currentDragData.initialY + deltaY
+          )
+        );
 
         chatModal.style.left = `${newX}px`;
         chatModal.style.top = `${newY}px`;
@@ -1366,8 +1518,14 @@ const MigakuGPT = {
         const deltaX = e.clientX - MigakuGPT.currentResizeData.startX;
         const deltaY = e.clientY - MigakuGPT.currentResizeData.startY;
 
-        const newWidth = Math.max(320, MigakuGPT.currentResizeData.initialWidth + deltaX);
-        const newHeight = Math.max(400, MigakuGPT.currentResizeData.initialHeight + deltaY);
+        const newWidth = Math.max(
+          320,
+          MigakuGPT.currentResizeData.initialWidth + deltaX
+        );
+        const newHeight = Math.max(
+          400,
+          MigakuGPT.currentResizeData.initialHeight + deltaY
+        );
 
         chatModal.style.width = `${newWidth}px`;
         chatModal.style.height = `${newHeight}px`;
@@ -1393,7 +1551,7 @@ const MigakuGPT = {
         startX: e.clientX,
         startY: e.clientY,
         initialWidth: chatModal.offsetWidth,
-        initialHeight: chatModal.offsetHeight
+        initialHeight: chatModal.offsetHeight,
       };
 
       chatModal.style.transition = "none";
@@ -1401,10 +1559,26 @@ const MigakuGPT = {
       e.stopPropagation();
     });
 
-    Utils.safeAddListener(Utils.safeGetElement("mgkChatClose"), "click", MigakuGPT.close);
-    Utils.safeAddListener(Utils.safeGetElement("mgkChatClear"), "click", MigakuGPT.clearChat);
-    Utils.safeAddListener(Utils.safeGetElement("mgkSaveApiKey"), "click", MigakuGPT.saveApiKey);
-    Utils.safeAddListener(Utils.safeGetElement("mgkChatSend"), "click", MigakuGPT.sendMessage);
+    Utils.safeAddListener(
+      Utils.safeGetElement("mgkChatClose"),
+      "click",
+      MigakuGPT.close
+    );
+    Utils.safeAddListener(
+      Utils.safeGetElement("mgkChatClear"),
+      "click",
+      MigakuGPT.clearChat
+    );
+    Utils.safeAddListener(
+      Utils.safeGetElement("mgkSaveApiKey"),
+      "click",
+      MigakuGPT.saveApiKey
+    );
+    Utils.safeAddListener(
+      Utils.safeGetElement("mgkChatSend"),
+      "click",
+      MigakuGPT.sendMessage
+    );
 
     const chatInput = Utils.safeGetElement("mgkChatInput");
     Utils.safeAddListener(chatInput, "keydown", (e) => {
@@ -1478,14 +1652,16 @@ const MigakuGPT = {
       </div>
     `;
 
-    messagesContainer.querySelectorAll('.mgk-quick-action').forEach(button => {
-      Utils.safeAddListener(button, 'click', () => {
-        const message = button.getAttribute('data-message');
-        if (message) {
-          MigakuGPT.quickMessage(message);
-        }
+    messagesContainer
+      .querySelectorAll(".mgk-quick-action")
+      .forEach((button) => {
+        Utils.safeAddListener(button, "click", () => {
+          const message = button.getAttribute("data-message");
+          if (message) {
+            MigakuGPT.quickMessage(message);
+          }
+        });
       });
-    });
 
     MigakuGPT.chatHistory = [];
   },
@@ -1514,96 +1690,101 @@ const MigakuGPT = {
     MigakuGPT.initializeChat();
   },
 
-    addMessage: (content, isUser = false) => {
-        const messagesContainer = Utils.safeGetElement("mgkChatMessages");
-        const messageDiv = document.createElement("div");
-        messageDiv.className = `mgk-chat-message ${isUser ? 'user' : 'assistant'}`;
+  addMessage: (content, isUser = false) => {
+    const messagesContainer = Utils.safeGetElement("mgkChatMessages");
+    const messageDiv = document.createElement("div");
+    messageDiv.className = `mgk-chat-message ${isUser ? "user" : "assistant"}`;
 
-        // simple markdown parsing
-        content = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-        content = content.replace(/\*(.*?)\*/g, '<em>$1</em>');
-        content = content.replace(/`(.*?)`/g, '<code style="background:rgba(255,255,255,0.1);padding:2px 6px;border-radius:4px;font-size:0.8rem;">$1</code>');
-        content = content.replace(/^### (.*$)/gm, '<h4>$1</h4>');
-        content = content.replace(/^## (.*$)/gm, '<h3>$1</h3>');
-        content = content.replace(/^- (.*$)/gm, '• $1');
+    // simple markdown parsing
+    content = content.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+    content = content.replace(/\*(.*?)\*/g, "<em>$1</em>");
+    content = content.replace(
+      /`(.*?)`/g,
+      '<code style="background:rgba(255,255,255,0.1);padding:2px 6px;border-radius:4px;font-size:0.8rem;">$1</code>'
+    );
+    content = content.replace(/^### (.*$)/gm, "<h4>$1</h4>");
+    content = content.replace(/^## (.*$)/gm, "<h3>$1</h3>");
+    content = content.replace(/^- (.*$)/gm, "• $1");
 
-        messageDiv.innerHTML = content;
+    messageDiv.innerHTML = content;
 
-        if(!isUser) {
-            MigakuGPT.replaceYouTubeLinks(messageDiv);
-        }
+    if (!isUser) {
+      MigakuGPT.replaceYouTubeLinks(messageDiv);
+    }
 
-        messagesContainer.appendChild(messageDiv);
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    },
+    messagesContainer.appendChild(messageDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  },
 
   formatMessage: (content) => {
-    content = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    content = content.replace(/\*(.*?)\*/g, '<em>$1</em>');
-    content = content.replace(/`(.*?)`/g, '<code style="background:rgba(255,255,255,0.1);padding:2px 6px;border-radius:4px;font-size:0.8rem;">$1</code>');
-    content = content.replace(/^### (.*$)/gm, '<h4>$1</h4>');
-    content = content.replace(/^## (.*$)/gm, '<h3>$1</h3>');
-    content = content.replace(/^- (.*$)/gm, '• $1');
+    content = content.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+    content = content.replace(/\*(.*?)\*/g, "<em>$1</em>");
+    content = content.replace(
+      /`(.*?)`/g,
+      '<code style="background:rgba(255,255,255,0.1);padding:2px 6px;border-radius:4px;font-size:0.8rem;">$1</code>'
+    );
+    content = content.replace(/^### (.*$)/gm, "<h4>$1</h4>");
+    content = content.replace(/^## (.*$)/gm, "<h3>$1</h3>");
+    content = content.replace(/^- (.*$)/gm, "• $1");
     content = MigakuGPT.processVideoLinks(content);
     content = MigakuGPT.processLinkPreviews(content);
 
     return content;
   },
-    replaceYouTubeLinks: (container) => {
-        // regex for youtube URLs - supports youtube.com, youtu.be, mobile, embed formats
-        const youtubeRegex = /https?:\/\/(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/)|youtu\.be\/|m\.youtube\.com\/watch\?v=)([a-zA-Z0-9_-]{11})/g;
+  replaceYouTubeLinks: (container) => {
+    // regex for youtube URLs - supports youtube.com, youtu.be, mobile, embed formats
+    const youtubeRegex =
+      /https?:\/\/(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/)|youtu\.be\/|m\.youtube\.com\/watch\?v=)([a-zA-Z0-9_-]{11})/g;
 
-        const walker = document.createTreeWalker(
-            container,
-            NodeFilter.SHOW_TEXT,
-            null,
-            false
-        );
+    const walker = document.createTreeWalker(
+      container,
+      NodeFilter.SHOW_TEXT,
+      null,
+      false
+    );
 
-        const textNodes = [];
-        let node;
-        while (node = walker.nextNode()) {
-            textNodes.push(node);
+    const textNodes = [];
+    let node;
+    while ((node = walker.nextNode())) {
+      textNodes.push(node);
+    }
+
+    textNodes.forEach((textNode) => {
+      const text = textNode.textContent;
+      const matches = [...text.matchAll(youtubeRegex)];
+
+      if (matches.length > 0) {
+        const fragment = document.createDocumentFragment();
+        let lastIndex = 0;
+
+        matches.forEach((match) => {
+          const [fullMatch, videoId] = match;
+          const matchStart = match.index;
+
+          if (matchStart > lastIndex) {
+            fragment.appendChild(
+              document.createTextNode(text.slice(lastIndex, matchStart))
+            );
+          }
+
+          const videoElement = MigakuGPT.createVideoElement(videoId);
+          fragment.appendChild(videoElement);
+
+          lastIndex = matchStart + fullMatch.length;
+        });
+
+        if (lastIndex < text.length) {
+          fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
         }
 
-        textNodes.forEach(textNode => {
-            const text = textNode.textContent;
-            const matches = [...text.matchAll(youtubeRegex)];
-
-            if (matches.length > 0) {
-                const fragment = document.createDocumentFragment();
-                let lastIndex = 0;
-
-                matches.forEach(match => {
-                    const [fullMatch, videoId] = match;
-                    const matchStart = match.index;
-
-                    if (matchStart > lastIndex) {
-                        fragment.appendChild(
-                            document.createTextNode(text.slice(lastIndex, matchStart))
-                        );
-                    }
-
-                    const videoElement = MigakuGPT.createVideoElement(videoId);
-                    fragment.appendChild(videoElement);
-
-                    lastIndex = matchStart + fullMatch.length;
-                });
-
-                if (lastIndex < text.length) {
-                    fragment.appendChild(
-                        document.createTextNode(text.slice(lastIndex))
-                    );
-                }
-
-                textNode.parentNode.replaceChild(fragment, textNode);
-            }
-        });
-    },
-    createVideoElement: (videoId) => {
-        const container = document.createElement('div');
-        container.className = 'yt-video-card';
-        container.style.cssText = `
+        textNode.parentNode.replaceChild(fragment, textNode);
+      }
+    });
+  },
+  createVideoElement: (videoId) => {
+    const container = document.createElement("div");
+    container.className = "yt-video-card";
+    container.style.cssText = `
             background: linear-gradient(135deg, rgba(79, 70, 229, 0.15), rgba(168, 85, 247, 0.15));
             border: 1px solid rgba(255, 255, 255, 0.2);
             border-radius: 12px;
@@ -1614,8 +1795,8 @@ const MigakuGPT = {
             backdrop-filter: blur(10px);
         `;
 
-        const preview = document.createElement('div');
-        preview.style.cssText = `
+    const preview = document.createElement("div");
+    preview.style.cssText = `
             position: relative;
             height: 180px;
             background: rgba(0, 0, 0, 0.2);
@@ -1625,21 +1806,22 @@ const MigakuGPT = {
             justify-content: center;
         `;
 
-        const img = document.createElement('img');
-        img.src = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-        img.style.cssText = `
+    const img = document.createElement("img");
+    img.src = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+    img.style.cssText = `
             width: 100%;
             height: 100%;
             object-fit: cover;
             transition: transform 0.3s ease;
         `;
-        img.onerror = () => {
-            img.style.display = 'none';
-            preview.innerHTML = '<div style="color: rgba(255,255,255,0.6); font-size: 3rem;">📺</div>';
-        };
+    img.onerror = () => {
+      img.style.display = "none";
+      preview.innerHTML =
+        '<div style="color: rgba(255,255,255,0.6); font-size: 3rem;">📺</div>';
+    };
 
-        const overlay = document.createElement('div');
-        overlay.style.cssText = `
+    const overlay = document.createElement("div");
+    overlay.style.cssText = `
             position: absolute;
             top: 0;
             left: 0;
@@ -1653,9 +1835,9 @@ const MigakuGPT = {
             transition: opacity 0.3s ease;
         `;
 
-        const playBtn = document.createElement('div');
-        playBtn.innerHTML = '>';
-        playBtn.style.cssText = `
+    const playBtn = document.createElement("div");
+    playBtn.innerHTML = ">";
+    playBtn.style.cssText = `
             width: 60px;
             height: 60px;
             background: rgba(255, 255, 255, 0.9);
@@ -1669,8 +1851,8 @@ const MigakuGPT = {
             transition: all 0.3s ease;
         `;
 
-        const info = document.createElement('div');
-        info.style.cssText = `
+    const info = document.createElement("div");
+    info.style.cssText = `
             padding: 12px 16px;
             background: rgba(255, 255, 255, 0.05);
             display: flex;
@@ -1678,66 +1860,67 @@ const MigakuGPT = {
             align-items: center;
         `;
 
-        const title = document.createElement('span');
-        title.textContent = 'YouTube Video';
-        title.style.cssText = `
+    const title = document.createElement("span");
+    title.textContent = "YouTube Video";
+    title.style.cssText = `
             font-weight: 500;
             color: rgba(255, 255, 255, 0.9);
             font-size: 0.85rem;
         `;
 
-        const subtitle = document.createElement('span');
-        subtitle.textContent = 'Click to watch';
-        subtitle.style.cssText = `
+    const subtitle = document.createElement("span");
+    subtitle.textContent = "Click to watch";
+    subtitle.style.cssText = `
             font-size: 0.75rem;
             color: rgba(255, 255, 255, 0.6);
         `;
 
-        overlay.appendChild(playBtn);
-        preview.appendChild(img);
-        preview.appendChild(overlay);
-        info.appendChild(title);
-        info.appendChild(subtitle);
-        container.appendChild(preview);
-        container.appendChild(info);
+    overlay.appendChild(playBtn);
+    preview.appendChild(img);
+    preview.appendChild(overlay);
+    info.appendChild(title);
+    info.appendChild(subtitle);
+    container.appendChild(preview);
+    container.appendChild(info);
 
-        container.addEventListener('mouseenter', () => {
-            container.style.transform = 'translateY(-2px)';
-            container.style.boxShadow = '0 8px 25px rgba(79, 70, 229, 0.2)';
-            overlay.style.opacity = '1';
-            if (img.style.display !== 'none') {
-                img.style.transform = 'scale(1.05)';
-            }
-            playBtn.style.background = 'linear-gradient(135deg, #4f46e5, #a855f7)';
-            playBtn.style.color = 'white';
-        });
+    container.addEventListener("mouseenter", () => {
+      container.style.transform = "translateY(-2px)";
+      container.style.boxShadow = "0 8px 25px rgba(79, 70, 229, 0.2)";
+      overlay.style.opacity = "1";
+      if (img.style.display !== "none") {
+        img.style.transform = "scale(1.05)";
+      }
+      playBtn.style.background = "linear-gradient(135deg, #4f46e5, #a855f7)";
+      playBtn.style.color = "white";
+    });
 
-        container.addEventListener('mouseleave', () => {
-            container.style.transform = '';
-            container.style.boxShadow = '';
-            overlay.style.opacity = '0';
-            if (img.style.display !== 'none') {
-                img.style.transform = '';
-            }
-            playBtn.style.background = 'rgba(255, 255, 255, 0.9)';
-            playBtn.style.color = '#4f46e5';
-        });
+    container.addEventListener("mouseleave", () => {
+      container.style.transform = "";
+      container.style.boxShadow = "";
+      overlay.style.opacity = "0";
+      if (img.style.display !== "none") {
+        img.style.transform = "";
+      }
+      playBtn.style.background = "rgba(255, 255, 255, 0.9)";
+      playBtn.style.color = "#4f46e5";
+    });
 
-        container.addEventListener('click', () => {
-            window.open(`https://www.youtube.com/watch?v=${videoId}`, '_blank');
-        });
+    container.addEventListener("click", () => {
+      window.open(`https://www.youtube.com/watch?v=${videoId}`, "_blank");
+    });
 
-        return container;
-    },
-    processVideoLinks: (content) => {
-        const youtubeRegex = /https?:\/\/(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/)|youtu\.be\/|m\.youtube\.com\/watch\?v=)([a-zA-Z0-9_-]{11})/g;
+    return container;
+  },
+  processVideoLinks: (content) => {
+    const youtubeRegex =
+      /https?:\/\/(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/)|youtu\.be\/|m\.youtube\.com\/watch\?v=)([a-zA-Z0-9_-]{11})/g;
 
-        return content.replace(youtubeRegex, (match, videoId) => {
-            if (!videoId || videoId.length !== 11) {
-                return `<a href="${match}" target="_blank">${match}</a>`;
-            }
+    return content.replace(youtubeRegex, (match, videoId) => {
+      if (!videoId || videoId.length !== 11) {
+        return `<a href="${match}" target="_blank">${match}</a>`;
+      }
 
-            return `<div class="video-card" data-video="${videoId}">
+      return `<div class="video-card" data-video="${videoId}">
       <div class="video-preview">
         <img src="https://img.youtube.com/vi/${videoId}/maxresdefault.jpg"
              onerror="this.src='https://img.youtube.com/vi/${videoId}/hqdefault.jpg'"
@@ -1753,18 +1936,19 @@ const MigakuGPT = {
         <span class="video-action">Tap to watch</span>
       </div>
     </div>`;
-        });
-    },
+    });
+  },
 
   processLinkPreviews: (content) => {
-    const urlRegex = /https?:\/\/(?!(?:www\.)?(?:youtube\.com|youtu\.be))[^\s]+/gi;
+    const urlRegex =
+      /https?:\/\/(?!(?:www\.)?(?:youtube\.com|youtu\.be))[^\s]+/gi;
 
     return content.replace(urlRegex, (match) => {
       let domain;
       try {
-        domain = new URL(match).hostname.replace('www.', '');
+        domain = new URL(match).hostname.replace("www.", "");
       } catch {
-        domain = 'link';
+        domain = "link";
       }
 
       const icon = domain.substring(0, 2).toUpperCase();
@@ -1782,15 +1966,15 @@ const MigakuGPT = {
     });
   },
 
-    attachVideoListeners: (messageDiv) => {
-        messageDiv.querySelectorAll('.video-card').forEach(card => {
-            card.addEventListener('click', () => {
-                const videoId = card.dataset.video;
-                if (!videoId) return;
+  attachVideoListeners: (messageDiv) => {
+    messageDiv.querySelectorAll(".video-card").forEach((card) => {
+      card.addEventListener("click", () => {
+        const videoId = card.dataset.video;
+        if (!videoId) return;
 
-                const player = document.createElement('div');
-                player.className = 'video-player';
-                player.innerHTML = `
+        const player = document.createElement("div");
+        player.className = "video-player";
+        player.innerHTML = `
         <div class="player-header">
           <span>YouTube Video</span>
           <button class="close-btn">×</button>
@@ -1803,19 +1987,19 @@ const MigakuGPT = {
         </div>
       `;
 
-                card.replaceWith(player);
+        card.replaceWith(player);
 
-                player.querySelector('.close-btn').addEventListener('click', () => {
-                    player.replaceWith(card);
-                });
-            });
+        player.querySelector(".close-btn").addEventListener("click", () => {
+          player.replaceWith(card);
         });
-    },
+      });
+    });
+  },
 
   createVideoElement: (videoId) => {
-      const container = document.createElement('div');
-      container.className = 'yt-video-card';
-      container.style.cssText = `
+    const container = document.createElement("div");
+    container.className = "yt-video-card";
+    container.style.cssText = `
           background: linear-gradient(135deg, rgba(79, 70, 229, 0.15), rgba(168, 85, 247, 0.15));
           border: 1px solid rgba(255, 255, 255, 0.2);
           border-radius: 12px;
@@ -1826,8 +2010,8 @@ const MigakuGPT = {
           backdrop-filter: blur(10px);
       `;
 
-      const preview = document.createElement('div');
-      preview.style.cssText = `
+    const preview = document.createElement("div");
+    preview.style.cssText = `
           position: relative;
           height: 180px;
           background: rgba(0, 0, 0, 0.2);
@@ -1837,21 +2021,22 @@ const MigakuGPT = {
           justify-content: center;
       `;
 
-      const img = document.createElement('img');
-      img.src = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-      img.style.cssText = `
+    const img = document.createElement("img");
+    img.src = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+    img.style.cssText = `
           width: 100%;
           height: 100%;
           object-fit: cover;
           transition: transform 0.3s ease;
       `;
-      img.onerror = () => {
-          img.style.display = 'none';
-          preview.innerHTML = '<div style="color: rgba(255,255,255,0.6); font-size: 3rem;">📺</div>';
-      };
+    img.onerror = () => {
+      img.style.display = "none";
+      preview.innerHTML =
+        '<div style="color: rgba(255,255,255,0.6); font-size: 3rem;">📺</div>';
+    };
 
-      const overlay = document.createElement('div');
-      overlay.style.cssText = `
+    const overlay = document.createElement("div");
+    overlay.style.cssText = `
           position: absolute;
           top: 0;
           left: 0;
@@ -1865,9 +2050,9 @@ const MigakuGPT = {
           transition: opacity 0.3s ease;
       `;
 
-      const playBtn = document.createElement('div');
-      playBtn.innerHTML = '>';
-      playBtn.style.cssText = `
+    const playBtn = document.createElement("div");
+    playBtn.innerHTML = ">";
+    playBtn.style.cssText = `
           width: 60px;
           height: 60px;
           background: rgba(255, 255, 255, 0.9);
@@ -1881,8 +2066,8 @@ const MigakuGPT = {
           transition: all 0.3s ease;
       `;
 
-      const info = document.createElement('div');
-      info.style.cssText = `
+    const info = document.createElement("div");
+    info.style.cssText = `
           padding: 12px 16px;
           background: rgba(255, 255, 255, 0.05);
           display: flex;
@@ -1890,62 +2075,61 @@ const MigakuGPT = {
           align-items: center;
       `;
 
-      const title = document.createElement('span');
-      title.textContent = 'YouTube Video';
-      title.style.cssText = `
+    const title = document.createElement("span");
+    title.textContent = "YouTube Video";
+    title.style.cssText = `
           font-weight: 500;
           color: rgba(255, 255, 255, 0.9);
           font-size: 0.85rem;
       `;
 
-      const subtitle = document.createElement('span');
-      subtitle.textContent = 'Click to play';
-      subtitle.style.cssText = `
+    const subtitle = document.createElement("span");
+    subtitle.textContent = "Click to play";
+    subtitle.style.cssText = `
           font-size: 0.75rem;
           color: rgba(255, 255, 255, 0.6);
       `;
 
-      overlay.appendChild(playBtn);
-      preview.appendChild(img);
-      preview.appendChild(overlay);
-      info.appendChild(title);
-      info.appendChild(subtitle);
-      container.appendChild(preview);
-      container.appendChild(info);
+    overlay.appendChild(playBtn);
+    preview.appendChild(img);
+    preview.appendChild(overlay);
+    info.appendChild(title);
+    info.appendChild(subtitle);
+    container.appendChild(preview);
+    container.appendChild(info);
 
-      container.addEventListener('mouseenter', () => {
-          container.style.transform = 'translateY(-2px)';
-          container.style.boxShadow = '0 8px 25px rgba(79, 70, 229, 0.2)';
-          overlay.style.opacity = '1';
-          if(img.style.display !== 'none') {
-              img.style.transform = 'scale(1.05)';
-          }
-          playBtn.style.background = 'linear-gradient(135deg, #4f46e5, #a855f7)';
-          playBtn.style.color = 'white';
-      });
+    container.addEventListener("mouseenter", () => {
+      container.style.transform = "translateY(-2px)";
+      container.style.boxShadow = "0 8px 25px rgba(79, 70, 229, 0.2)";
+      overlay.style.opacity = "1";
+      if (img.style.display !== "none") {
+        img.style.transform = "scale(1.05)";
+      }
+      playBtn.style.background = "linear-gradient(135deg, #4f46e5, #a855f7)";
+      playBtn.style.color = "white";
+    });
 
-      container.addEventListener('mouseleave', () => {
-          container.style.transform = '';
-          container.style.boxShadow = '';
-          overlay.style.opacity = '0';
-          if(img.style.display !== 'none') {
-              img.style.transform = '';
-          }
-          playBtn.style.background = 'rgba(255, 255, 255, 0.9)';
-          playBtn.style.color = '#4f46e5';
-      });
+    container.addEventListener("mouseleave", () => {
+      container.style.transform = "";
+      container.style.boxShadow = "";
+      overlay.style.opacity = "0";
+      if (img.style.display !== "none") {
+        img.style.transform = "";
+      }
+      playBtn.style.background = "rgba(255, 255, 255, 0.9)";
+      playBtn.style.color = "#4f46e5";
+    });
 
-      container.addEventListener('click', () => {
-          MigakuGPT.expandVideo(container, videoId);
-      });
+    container.addEventListener("click", () => {
+      MigakuGPT.expandVideo(container, videoId);
+    });
 
-      return container;
+    return container;
   },
 
-
   expandVideo: (container, videoId) => {
-      const player = document.createElement('div');
-      player.style.cssText = `
+    const player = document.createElement("div");
+    player.style.cssText = `
           background: rgba(0, 0, 0, 0.9);
           border-radius: 12px;
           overflow: hidden;
@@ -1953,8 +2137,8 @@ const MigakuGPT = {
           border: 1px solid rgba(255, 255, 255, 0.1);
       `;
 
-      const header = document.createElement('div');
-      header.style.cssText = `
+    const header = document.createElement("div");
+    header.style.cssText = `
           padding: 12px 16px;
           display: flex;
           justify-content: space-between;
@@ -1963,16 +2147,16 @@ const MigakuGPT = {
           border-bottom: 1px solid rgba(255, 255, 255, 0.1);
       `;
 
-      const headerTitle = document.createElement('span');
-      headerTitle.textContent = 'YouTube Video';
-      headerTitle.style.cssText = `
+    const headerTitle = document.createElement("span");
+    headerTitle.textContent = "YouTube Video";
+    headerTitle.style.cssText = `
           font-weight: 500;
           color: rgba(255, 255, 255, 0.9);
       `;
 
-      const closeBtn = document.createElement('button');
-      closeBtn.innerHTML = '×';
-      closeBtn.style.cssText = `
+    const closeBtn = document.createElement("button");
+    closeBtn.innerHTML = "×";
+    closeBtn.style.cssText = `
           background: rgba(255, 255, 255, 0.1);
           border: none;
           color: white;
@@ -1987,28 +2171,28 @@ const MigakuGPT = {
           transition: all 0.2s ease;
       `;
 
-      closeBtn.addEventListener('mouseenter', () => {
-          closeBtn.style.background = 'rgba(239, 68, 68, 0.8)';
-      });
+    closeBtn.addEventListener("mouseenter", () => {
+      closeBtn.style.background = "rgba(239, 68, 68, 0.8)";
+    });
 
-      closeBtn.addEventListener('mouseleave', () => {
-          closeBtn.style.background = 'rgba(255, 255, 255, 0.1)';
-      });
+    closeBtn.addEventListener("mouseleave", () => {
+      closeBtn.style.background = "rgba(255, 255, 255, 0.1)";
+    });
 
-      closeBtn.addEventListener('click', () => {
-          player.replaceWith(container);
-      });
+    closeBtn.addEventListener("click", () => {
+      player.replaceWith(container);
+    });
 
-      const content = document.createElement('div');
-      content.style.cssText = `
+    const content = document.createElement("div");
+    content.style.cssText = `
           position: relative;
           width: 100%;
           height: 250px;
       `;
 
-      const iframe = document.createElement('iframe');
-      iframe.src = `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`;
-      iframe.style.cssText = `
+    const iframe = document.createElement("iframe");
+    iframe.src = `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`;
+    iframe.style.cssText = `
           position: absolute;
           top: 0;
           left: 0;
@@ -2017,40 +2201,25 @@ const MigakuGPT = {
           border: none;
       `;
 
-      iframe.setAttribute('title', 'YouTube video player');
-      iframe.setAttribute('frameborder', '0');
-      iframe.setAttribute('allowfullscreen', '');
-      iframe.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
-      iframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share');
+    iframe.setAttribute("title", "YouTube video player");
+    iframe.setAttribute("frameborder", "0");
+    iframe.setAttribute("allowfullscreen", "");
+    iframe.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
+    iframe.setAttribute(
+      "allow",
+      "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+    );
 
-      content.appendChild(iframe);
-      header.appendChild(headerTitle);
-      header.appendChild(closeBtn);
-      player.appendChild(header);
-      player.appendChild(content);
+    content.appendChild(iframe);
+    header.appendChild(headerTitle);
+    header.appendChild(closeBtn);
+    player.appendChild(header);
+    player.appendChild(content);
 
-      container.replaceWith(player);
+    container.replaceWith(player);
   },
 
-    quickMessage: (message) => {
-        const input = Utils.safeGetElement("mgkChatInput");
-        if (!input) {
-            console.error("[MGK] Chat input not found");
-            return;
-        }
-
-        input.value = message;
-
-        try {
-            input.dispatchEvent(new Event('input'));
-        } catch (e) {
-            console.warn("[MGK] Failed to dispatch input event:", e);
-        }
-
-        MigakuGPT.sendMessage();
-    },
-
-   quickMessage: (message) => {
+  quickMessage: (message) => {
     const input = Utils.safeGetElement("mgkChatInput");
     if (!input) {
       console.error("[MGK] Chat input not found");
@@ -2060,7 +2229,25 @@ const MigakuGPT = {
     input.value = message;
 
     try {
-      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event("input"));
+    } catch (e) {
+      console.warn("[MGK] Failed to dispatch input event:", e);
+    }
+
+    MigakuGPT.sendMessage();
+  },
+
+  quickMessage: (message) => {
+    const input = Utils.safeGetElement("mgkChatInput");
+    if (!input) {
+      console.error("[MGK] Chat input not found");
+      return;
+    }
+
+    input.value = message;
+
+    try {
+      input.dispatchEvent(new Event("input"));
     } catch (e) {
       console.warn("[MGK] Failed to dispatch input event:", e);
     }
@@ -2077,7 +2264,7 @@ const MigakuGPT = {
 
     input.value = "";
     input.style.height = "auto";
-    if(sendBtn) sendBtn.disabled = true;
+    if (sendBtn) sendBtn.disabled = true;
 
     MigakuGPT.addMessage(message, true);
     MigakuGPT.chatHistory.push({ role: "user", content: message });
@@ -2087,20 +2274,22 @@ const MigakuGPT = {
     loadingDiv.className = "mgk-chat-message assistant mgk-loading";
     loadingDiv.innerHTML = "Thinking...";
     const messagesContainer = Utils.safeGetElement("mgkChatMessages");
-    if(messagesContainer) messagesContainer.appendChild(loadingDiv);
+    if (messagesContainer) messagesContainer.appendChild(loadingDiv);
 
     try {
       const response = await MigakuGPT.callOpenAI(message);
-      if(loadingDiv.parentNode) loadingDiv.remove();
+      if (loadingDiv.parentNode) loadingDiv.remove();
       MigakuGPT.addMessage(response);
       MigakuGPT.chatHistory.push({ role: "assistant", content: response });
     } catch (error) {
-      if(loadingDiv.parentNode) loadingDiv.remove();
-      MigakuGPT.addMessage(`Error: ${error.message}. Please check your API key.`);
+      if (loadingDiv.parentNode) loadingDiv.remove();
+      MigakuGPT.addMessage(
+        `Error: ${error.message}. Please check your API key.`
+      );
     }
 
-    if(sendBtn) sendBtn.disabled = false;
-    if(input) input.focus();
+    if (sendBtn) sendBtn.disabled = false;
+    if (input) input.focus();
   },
 
   callOpenAI: async (message) => {
@@ -2111,70 +2300,90 @@ const MigakuGPT = {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
         model: "gpt-4o-mini",
         messages: [
           { role: "system", content: systemPrompt },
           ...MigakuGPT.chatHistory.slice(-8), // keep last 8 for context otherwise token usage gets crazy
-          { role: "user", content: message }
+          { role: "user", content: message },
         ],
         functions: [
           {
             name: "web_search",
-            description: "Search the web for educational content, videos, and learning resources.",
+            description:
+              "Search the web for educational content, videos, and learning resources.",
             parameters: {
               type: "object",
               properties: {
                 query: { type: "string", description: "Search query" },
-                max_results: { type: "integer", description: "Max number of results", default: 3 }
+                max_results: {
+                  type: "integer",
+                  description: "Max number of results",
+                  default: 3,
+                },
               },
-              required: ["query"]
-            }
-          }
+              required: ["query"],
+            },
+          },
         ],
         max_tokens: 1200,
-        temperature: 0.7
-      })
+        temperature: 0.7,
+      }),
     });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(`API Error ${response.status}: ${errorData.error?.message || 'Unknown error'}`);
+      throw new Error(
+        `API Error ${response.status}: ${errorData.error?.message || "Unknown error"}`
+      );
     }
 
     const data = await response.json();
     const choice = data.choices[0];
-
 
     if (choice.message.function_call) {
       const functionName = choice.message.function_call.name;
       const functionArgs = JSON.parse(choice.message.function_call.arguments);
 
       if (functionName === "web_search") {
-        const searchResults = await MigakuGPT.performWebSearch(functionArgs.query, functionArgs.max_results || 3);
+        const searchResults = await MigakuGPT.performWebSearch(
+          functionArgs.query,
+          functionArgs.max_results || 3
+        );
 
         // send results back to gpt
-        const followUpResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${apiKey}`
-          },
-          body: JSON.stringify({
-            model: "gpt-4o-mini",
-            messages: [
-              { role: "system", content: systemPrompt },
-              ...MigakuGPT.chatHistory.slice(-8),
-              { role: "user", content: message },
-              { role: "assistant", content: null, function_call: choice.message.function_call },
-              { role: "function", name: "web_search", content: JSON.stringify(searchResults) }
-            ],
-            max_tokens: 1200,
-            temperature: 0.7
-          })
-        });
+        const followUpResponse = await fetch(
+          "https://api.openai.com/v1/chat/completions",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+              model: "gpt-4o-mini",
+              messages: [
+                { role: "system", content: systemPrompt },
+                ...MigakuGPT.chatHistory.slice(-8),
+                { role: "user", content: message },
+                {
+                  role: "assistant",
+                  content: null,
+                  function_call: choice.message.function_call,
+                },
+                {
+                  role: "function",
+                  name: "web_search",
+                  content: JSON.stringify(searchResults),
+                },
+              ],
+              max_tokens: 1200,
+              temperature: 0.7,
+            }),
+          }
+        );
 
         if (!followUpResponse.ok) {
           throw new Error(`Follow-up API Error ${followUpResponse.status}`);
@@ -2190,13 +2399,15 @@ const MigakuGPT = {
 
   performWebSearch: async (query, maxResults = 3) => {
     try {
-      const response = await fetch('https://raw.githubusercontent.com/wa-ra-ki/Migaku-Exporter/main/japanese_videos_batch.json');
+      const response = await fetch(
+        "https://raw.githubusercontent.com/wa-ra-ki/Migaku-Exporter/main/japanese_videos_batch.json"
+      );
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const videoData = await response.json();
-      const searchTerms = query.toLowerCase().split(' ');
+      const searchTerms = query.toLowerCase().split(" ");
       const matchedVideos = [];
 
       // score each video based on search terms
@@ -2206,8 +2417,10 @@ const MigakuGPT = {
           video.title,
           video.category,
           video.notes,
-          ...(video.tags || [])
-        ].join(' ').toLowerCase();
+          ...(video.tags || []),
+        ]
+          .join(" ")
+          .toLowerCase();
 
         for (const term of searchTerms) {
           if (searchableText.includes(term)) {
@@ -2218,7 +2431,10 @@ const MigakuGPT = {
             if (video.category.toLowerCase().includes(term)) {
               score += 1.5;
             }
-            if (video.tags && video.tags.some(tag => tag.toLowerCase().includes(term))) {
+            if (
+              video.tags &&
+              video.tags.some((tag) => tag.toLowerCase().includes(term))
+            ) {
               score += 1;
             }
           }
@@ -2227,7 +2443,7 @@ const MigakuGPT = {
         if (score > 0) {
           matchedVideos.push({
             ...video,
-            relevanceScore: score
+            relevanceScore: score,
           });
         }
       }
@@ -2236,23 +2452,22 @@ const MigakuGPT = {
         .sort((a, b) => b.relevanceScore - a.relevanceScore)
         .slice(0, maxResults);
 
-      const results = sortedVideos.map(video => ({
+      const results = sortedVideos.map((video) => ({
         title: video.title,
         snippet: video.notes || `${video.category} - Level: ${video.level}`,
         url: video.url,
         source: "Curated Japanese Learning Videos",
         channel: video.category,
         level: video.level,
-        tags: video.tags
+        tags: video.tags,
       }));
 
       return {
         query: query,
         results: results,
         timestamp: new Date().toISOString(),
-        source: "japanese_videos_batch.json"
+        source: "japanese_videos_batch.json",
       };
-
     } catch (error) {
       console.error("Failed to fetch video data:", error);
       return MigakuGPT.getCuratedVideoSuggestions(query, maxResults);
@@ -2269,7 +2484,7 @@ const MigakuGPT = {
         source: "Fallback Suggestions",
         channel: "Grammar Basics",
         level: "beginner",
-        tags: ["grammar", "beginner"]
+        tags: ["grammar", "beginner"],
       },
       {
         title: "Learn Japanese Hiragana in 1 Hour",
@@ -2278,7 +2493,7 @@ const MigakuGPT = {
         source: "Fallback Suggestions",
         channel: "Writing System",
         level: "beginner",
-        tags: ["hiragana", "writing"]
+        tags: ["hiragana", "writing"],
       },
       {
         title: "Japanese Listening Practice for Beginners",
@@ -2287,16 +2502,26 @@ const MigakuGPT = {
         source: "Fallback Suggestions",
         channel: "Listening Practice",
         level: "beginner",
-        tags: ["listening", "practice"]
-      }
+        tags: ["listening", "practice"],
+      },
     ];
 
     const queryLower = query.toLowerCase();
     let relevantVideos = [];
 
     for (const video of fallbackData) {
-      const searchText = [video.title, video.snippet, video.channel, ...video.tags].join(' ').toLowerCase();
-      if (searchText.includes(queryLower) || queryLower.split(' ').some(term => searchText.includes(term))) {
+      const searchText = [
+        video.title,
+        video.snippet,
+        video.channel,
+        ...video.tags,
+      ]
+        .join(" ")
+        .toLowerCase();
+      if (
+        searchText.includes(queryLower) ||
+        queryLower.split(" ").some((term) => searchText.includes(term))
+      ) {
         relevantVideos.push(video);
       }
     }
@@ -2309,7 +2534,7 @@ const MigakuGPT = {
       query: query,
       results: relevantVideos.slice(0, maxResults),
       timestamp: new Date().toISOString(),
-      note: "Fallback curated videos (JSON fetch failed)"
+      note: "Fallback curated videos (JSON fetch failed)",
     };
   },
 
@@ -2390,35 +2615,48 @@ Remember: Use the web_search function when users ask for videos, current informa
   },
 
   generateUserStats: (learningData) => {
-    if (!learningData || !learningData.cards || learningData.cards.length === 0) {
+    if (
+      !learningData ||
+      !learningData.cards ||
+      learningData.cards.length === 0
+    ) {
       return "No learning data available.";
     }
 
     const { decks, cards, wordLists } = learningData;
     const totalDecks = decks.length;
     const totalCards = cards.length;
-    const newCards = cards.filter(c => c.reviewCount === 0).length;
-    const reviewCards = cards.filter(c => c.interval > 1).length;
+    const newCards = cards.filter((c) => c.reviewCount === 0).length;
+    const reviewCards = cards.filter((c) => c.interval > 1).length;
 
     const languageStats = {};
-    decks.forEach(deck => {
-      const lang = deck.lang || 'Unknown';
+    decks.forEach((deck) => {
+      const lang = deck.lang || "Unknown";
       if (!languageStats[lang]) languageStats[lang] = 0;
-      languageStats[lang] += cards.filter(c => c.deckLang === lang).length;
+      languageStats[lang] += cards.filter((c) => c.deckLang === lang).length;
     });
 
-    const recentCards = cards.filter(c => c.reviewCount > 0);
-    const avgSuccess = recentCards.length > 0 ?
-      (recentCards.reduce((sum, c) => sum + (c.passCount / Math.max(c.reviewCount, 1)), 0) / recentCards.length * 100).toFixed(1) : 0;
+    const recentCards = cards.filter((c) => c.reviewCount > 0);
+    const avgSuccess =
+      recentCards.length > 0
+        ? (
+            (recentCards.reduce(
+              (sum, c) => sum + c.passCount / Math.max(c.reviewCount, 1),
+              0
+            ) /
+              recentCards.length) *
+            100
+          ).toFixed(1)
+        : 0;
 
     return `STATS SUMMARY:
 📚 ${totalDecks} decks, ${totalCards} total cards
 📊 ${newCards} new, ${reviewCards} review cards
-🌍 Languages: ${Object.keys(languageStats).join(', ')}
+🌍 Languages: ${Object.keys(languageStats).join(", ")}
 📈 Success rate: ${avgSuccess}%
 
 Use this data to provide personalized recommendations.`;
-  }
+  },
 };
 
 // field mapping config UI
@@ -2491,7 +2729,9 @@ const MappingModal = {
       transition: all 0.2s ease;
       backdrop-filter: blur(10px);
     `;
-    closeBtn.addEventListener("click", () => { backdrop.style.display = "none"; });
+    closeBtn.addEventListener("click", () => {
+      backdrop.style.display = "none";
+    });
     header.appendChild(closeBtn);
 
     card.appendChild(header);
@@ -2508,7 +2748,8 @@ const MappingModal = {
       const btn = document.createElement("button");
       btn.id = id;
       btn.textContent = text;
-      btn.style.cssText = isPrimary ? `
+      btn.style.cssText = isPrimary
+        ? `
         background: linear-gradient(135deg, #4f46e5, #06b6d4);
         border: none;
         color: white;
@@ -2518,7 +2759,8 @@ const MappingModal = {
         font-weight: 500;
         transition: all 0.2s ease;
         backdrop-filter: blur(10px);
-      ` : `
+      `
+        : `
         background: rgba(255, 255, 255, 0.1);
         border: 1px solid rgba(255, 255, 255, 0.2);
         color: white;
@@ -2548,10 +2790,12 @@ const MappingModal = {
 
     Utils.safeAddListener(Utils.safeGetElement("mgkMapAuto"), "click", () => {
       const inputs = card.querySelectorAll("input[data-migaku-name]");
-      inputs.forEach(inp => {
+      inputs.forEach((inp) => {
         const mig = (inp.getAttribute("data-migaku-name") || "").toLowerCase();
-        if (mig.includes("word") && !mig.includes("sentence")) inp.value = "Word";
-        else if (mig.includes("sentence") && !mig.includes("translated")) inp.value = "Sentence";
+        if (mig.includes("word") && !mig.includes("sentence"))
+          inp.value = "Word";
+        else if (mig.includes("sentence") && !mig.includes("translated"))
+          inp.value = "Sentence";
         else if (mig.includes("translated")) inp.value = "Translation";
         else if (mig.includes("definition")) inp.value = "Definition";
         else if (mig.includes("image")) inp.value = "Image";
@@ -2562,7 +2806,7 @@ const MappingModal = {
 
     Utils.safeAddListener(Utils.safeGetElement("mgkMapReset"), "click", () => {
       const inputs = card.querySelectorAll("input[data-migaku-name]");
-      inputs.forEach(inp => {
+      inputs.forEach((inp) => {
         inp.value = inp.getAttribute("data-migaku-name");
       });
     });
@@ -2570,10 +2814,10 @@ const MappingModal = {
     Utils.safeAddListener(Utils.safeGetElement("mgkMapSave"), "click", () => {
       const inputs = card.querySelectorAll("input[data-migaku-name]");
       const arr = [];
-      inputs.forEach(inp => {
+      inputs.forEach((inp) => {
         arr.push({
           migakuName: inp.getAttribute("data-migaku-name"),
-          ankiName: (inp.value || inp.getAttribute("data-migaku-name"))
+          ankiName: inp.value || inp.getAttribute("data-migaku-name"),
         });
       });
 
@@ -2590,29 +2834,33 @@ const MappingModal = {
     Utils.safeGetElement(CONFIG.MAPPING_MODAL_ID).style.display = "flex";
   },
 
-renderGlobalMapping: () => {
+  renderGlobalMapping: () => {
     const body = Utils.safeGetElement("mgkMapBody");
     if (!body) return;
 
     body.innerHTML = "";
 
     const info = document.createElement("div");
-    info.style.cssText = "margin-bottom:20px;color:rgba(255,255,255,0.7);font-size:0.9rem;";
-    info.textContent = "Customize the Anki field names that will be applied to every card type. These names will become the Anki model field names.";
+    info.style.cssText =
+      "margin-bottom:20px;color:rgba(255,255,255,0.7);font-size:0.9rem;";
+    info.textContent =
+      "Customize the Anki field names that will be applied to every card type. These names will become the Anki model field names.";
     body.appendChild(info);
 
     const mappings = Storage.loadMappings();
     const existing = mappings["__global__"] || mappings.__global || null;
 
     const fieldsContainer = document.createElement("div");
-    fieldsContainer.style.cssText = "display:flex;flex-direction:column;gap:16px;";
+    fieldsContainer.style.cssText =
+      "display:flex;flex-direction:column;gap:16px;";
 
     CONFIG.MIGAKU_FIELDS.forEach((migName, idx) => {
       const row = document.createElement("div");
       row.style.cssText = "display:flex;gap:16px;align-items:center;";
 
       const left = document.createElement("div");
-      left.style.cssText = "width:40%;font-size:0.9rem;color:rgba(255,255,255,0.8);font-weight:500;";
+      left.style.cssText =
+        "width:40%;font-size:0.9rem;color:rgba(255,255,255,0.8);font-weight:500;";
       left.textContent = migName;
 
       const right = document.createElement("div");
@@ -2656,7 +2904,7 @@ renderGlobalMapping: () => {
     });
 
     body.appendChild(fieldsContainer);
-  }
+  },
 };
 
 // media download and caching
@@ -2718,18 +2966,31 @@ const MediaHandler = {
     if (out.length === 0) {
       const trimmed = value.trim();
       // Migaku stores multiple images pipe-separated — always split on | first
-      const segments = trimmed.split("|").map(s => s.trim()).filter(Boolean);
+      const segments = trimmed
+        .split("|")
+        .map((s) => s.trim())
+        .filter(Boolean);
       for (const seg of segments) {
-        if (seg.startsWith("r2://") || seg.startsWith("/") || seg.startsWith("data:") ||
-            /\.(jpe?g|png|gif|webp|svg|mp3|m4a|ogg|wav|aac|opus)(\?|$)/i.test(seg)) {
+        if (
+          seg.startsWith("r2://") ||
+          seg.startsWith("/") ||
+          seg.startsWith("data:") ||
+          /\.(jpe?g|png|gif|webp|svg|mp3|m4a|ogg|wav|aac|opus)(\?|$)/i.test(seg)
+        ) {
           addPath(seg);
         } else {
           // No pipe — try splitting on other non-space delimiters only
           for (const token of seg.split(/[\n\r\t,;]+/)) {
             const t = token.trim();
             if (!t) continue;
-            if (t.startsWith("data:") || t.startsWith("/") || t.startsWith("r2://") ||
-                /\.(jpe?g|png|gif|webp|svg|mp3|m4a|ogg|wav|aac|opus)(\?|$)/i.test(t)) {
+            if (
+              t.startsWith("data:") ||
+              t.startsWith("/") ||
+              t.startsWith("r2://") ||
+              /\.(jpe?g|png|gif|webp|svg|mp3|m4a|ogg|wav|aac|opus)(\?|$)/i.test(
+                t
+              )
+            ) {
               addPath(t);
             }
           }
@@ -2750,15 +3011,18 @@ const MediaHandler = {
 
     const base = "https://file-sync-worker-api.migaku.com/data/";
     // encode each path segment individually (preserve slashes)
-    const encodedPath = path.split("/").map(seg => encodeURIComponent(decodeURIComponent(seg))).join("/");
+    const encodedPath = path
+      .split("/")
+      .map((seg) => encodeURIComponent(decodeURIComponent(seg)))
+      .join("/");
     const url = base + encodedPath;
 
     try {
       const resp = await fetch(url, {
         headers: { Authorization: "Bearer " + (auth?.token || "") },
-        cache: "force-cache"
+        cache: "force-cache",
       });
-      if (resp.status !== 200) return null;  // 404/500 etc — skip silently
+      if (resp.status !== 200) return null; // 404/500 etc — skip silently
       return await resp.blob();
     } catch (e) {
       return null;
@@ -2766,46 +3030,49 @@ const MediaHandler = {
   },
 
   openLocalMediaCacheDb() {
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       const req = indexedDB.open("unofficialmgkexporterMediaDb", 1);
       req.onupgradeneeded = (ev) => {
         const idb = ev.target.result;
         if (!idb.objectStoreNames.contains(CONFIG.MEDIA_STORE_NAME)) {
           idb.createObjectStore(CONFIG.MEDIA_STORE_NAME, {
             keyPath: "key",
-            autoIncrement: false
+            autoIncrement: false,
           });
         }
       };
-      req.onsuccess = (ev) => resolve(ev.target.result)
-      req.onerror = () => resolve(null)
+      req.onsuccess = (ev) => resolve(ev.target.result);
+      req.onerror = () => resolve(null);
     });
   },
 
   saveBlobToMediaCache(db, key, blob) {
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       try {
-        var tx = db.transaction(CONFIG.MEDIA_STORE_NAME, 'readwrite');
+        var tx = db.transaction(CONFIG.MEDIA_STORE_NAME, "readwrite");
         var store = tx.objectStore(CONFIG.MEDIA_STORE_NAME);
         var addReq = store.add({ key, blob });
-        addReq.onsuccess = (ev) => resolve(ev.target?.result)
-        addReq.onerror = () => resolve(null)
+        addReq.onsuccess = (ev) => resolve(ev.target?.result);
+        addReq.onerror = () => resolve(null);
       } catch {
-        resolve(null)
+        resolve(null);
       }
     });
   },
 
   getBlobFromMediaCache(db, key) {
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       try {
-        if(!db) return resolve(null);
-        var req = db.transaction(CONFIG.MEDIA_STORE_NAME, 'readonly')
-                     .objectStore(CONFIG.MEDIA_STORE_NAME).get(key);
-        req.onsuccess = (ev) => resolve(ev.target.result ? ev.target.result.blob : null)
-        req.onerror = () => resolve(null)
+        if (!db) return resolve(null);
+        var req = db
+          .transaction(CONFIG.MEDIA_STORE_NAME, "readonly")
+          .objectStore(CONFIG.MEDIA_STORE_NAME)
+          .get(key);
+        req.onsuccess = (ev) =>
+          resolve(ev.target.result ? ev.target.result.blob : null);
+        req.onerror = () => resolve(null);
       } catch {
-        resolve(null)
+        resolve(null);
       }
     });
   },
@@ -2824,14 +3091,16 @@ const MediaHandler = {
     for (const typeKey of cardsByType.keys()) {
       const list = cardsByType.get(typeKey);
       const ct = cardTypes.get(typeKey);
-      const defFields = (ct && ct.config && Array.isArray(ct.config.fields)) ?
-        ct.config.fields : [{ name: "Field1", type: "TEXT" }];
+      const defFields =
+        ct && ct.config && Array.isArray(ct.config.fields)
+          ? ct.config.fields
+          : [{ name: "Field1", type: "TEXT" }];
 
       for (const card of list) {
         const allValues = [
           card.primaryField || "",
           card.secondaryField || "",
-          ...(card.fields ? card.fields.split('\u001f') : [])
+          ...(card.fields ? card.fields.split("\u001f") : []),
         ];
 
         for (let i = 0; i < fieldNames.length; i++) {
@@ -2843,7 +3112,10 @@ const MediaHandler = {
           const isImageField = defType === "IMAGE";
           const isAudioField = defType === "AUDIO" || defType === "AUDIO_LONG";
 
-          if ((isImageField && settings.includeImages) || (isAudioField && settings.includeAudio)) {
+          if (
+            (isImageField && settings.includeImages) ||
+            (isAudioField && settings.includeAudio)
+          ) {
             const paths = MediaHandler.extractMediaPaths(value);
             if (paths.length === 0) {
               const normalized = MediaHandler.normalizeMediaPath(value);
@@ -2856,19 +3128,19 @@ const MediaHandler = {
       }
     }
 
-    Utils.setStatus('Downloading media...');
+    Utils.setStatus("Downloading media...");
     var queue = Array.from(pathSet);
     var total = queue.length;
     var done = 0;
 
-    if(total === 0) {
-      Progress.show('No media to download', 100);
+    if (total === 0) {
+      Progress.show("No media to download", 100);
       await Utils.sleep(300);
       Progress.hide();
       return new Map();
     }
 
-    Progress.show('Downloading media...', 0);
+    Progress.show("Downloading media...", 0);
     var access = null;
     try {
       access = await FirebaseAuth.getAccessToken();
@@ -2879,23 +3151,30 @@ const MediaHandler = {
 
     var mediaMap = new Map();
     var worker = async () => {
-      while(queue.length > 0) {
+      while (queue.length > 0) {
         var path = queue.shift();
         var extension = (() => {
-          var ext = '.' + path.split('.').pop();
-          return ext.length >= 7 ? '' : ext;
+          var ext = "." + path.split(".").pop();
+          return ext.length >= 7 ? "" : ext;
         })();
 
         // sha1 hash for filename
-        var shaBuf = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(path));
-        var shaHex = Array.from(new Uint8Array(shaBuf))
-                           .map(b => b.toString(16).padStart(2,'0'))
-                           .join('') + extension;
+        var shaBuf = await crypto.subtle.digest(
+          "SHA-1",
+          new TextEncoder().encode(path)
+        );
+        var shaHex =
+          Array.from(new Uint8Array(shaBuf))
+            .map((b) => b.toString(16).padStart(2, "0"))
+            .join("") + extension;
 
-        if(mediaDb && await MediaHandler.mediaCacheHasKey(mediaDb, shaHex)) {
+        if (mediaDb && (await MediaHandler.mediaCacheHasKey(mediaDb, shaHex))) {
           done++;
           Utils.setStatus(`${done}/${total} – from cache: ${path}`);
-          Progress.set((done/total)*100, `Downloading media – ${done}/${total}`);
+          Progress.set(
+            (done / total) * 100,
+            `Downloading media – ${done}/${total}`
+          );
           mediaMap.set(path, shaHex);
           continue;
         }
@@ -2903,35 +3182,45 @@ const MediaHandler = {
         var blob = await MediaHandler.fetchRemoteMediaBlob(path, access);
         done++;
         Utils.setStatus(`${done}/${total} – downloaded: ${path}`);
-        Progress.set((done/total)*100, `Downloading media – ${done}/${total}`);
+        Progress.set(
+          (done / total) * 100,
+          `Downloading media – ${done}/${total}`
+        );
 
-        if(!blob) continue;
+        if (!blob) continue;
 
-        if(settings.maxMediaSizeBytes && blob.size > settings.maxMediaSizeBytes) {
-          Utils.log('Skipping large media', path, Utils.formatBytes(blob.size));
+        if (
+          settings.maxMediaSizeBytes &&
+          blob.size > settings.maxMediaSizeBytes
+        ) {
+          Utils.log("Skipping large media", path, Utils.formatBytes(blob.size));
           continue;
         }
 
         var outBlob = blob;
         try {
-          if(settings.convertMedia && settings.enableImageConversion &&
-              path.match(/\.(jpg|jpeg|png|webp|gif)$/i)) {
+          if (
+            settings.convertMedia &&
+            settings.enableImageConversion &&
+            path.match(/\.(jpg|jpeg|png|webp|gif)$/i)
+          ) {
             var resized = await MediaProcessor.imageResizeToBlob(
               blob,
               settings.imageMaxDimension || 1024,
               settings.imageQuality ?? 0.85
             );
-            if(resized) outBlob = resized;
+            if (resized) outBlob = resized;
           }
         } catch (e) {
-          console.warn('Media conversion failed for', path, e);
+          console.warn("Media conversion failed for", path, e);
           outBlob = blob;
         }
 
         try {
-          if(mediaDb) await MediaHandler.saveBlobToMediaCache(mediaDb, shaHex, outBlob);
+          if (mediaDb)
+            await MediaHandler.saveBlobToMediaCache(mediaDb, shaHex, outBlob);
         } catch (e) {
-          console.warn('Cache save failed', e);
+          console.warn("Cache save failed", e);
         }
 
         mediaMap.set(path, shaHex);
@@ -2947,32 +3236,44 @@ const MediaHandler = {
     await Utils.sleep(250);
     Progress.hide();
     return mediaMap;
-  }
+  },
 };
 
 // export logic
 const ExportProcessor = {
-  async fillNotesAndCards(ankiDb, mediaDb, zip, cardsByType, cardTypes, modelMapping, settings) {
+  async fillNotesAndCards(
+    ankiDb,
+    mediaDb,
+    zip,
+    cardsByType,
+    cardTypes,
+    modelMapping,
+    settings
+  ) {
     const mediaReverseMap = new Map();
     let nextMediaIndex = 0;
 
     async function ensureMediaInZip(dirtyPath) {
-      if(!dirtyPath) return null;
-      if(!mediaDb) return null;
+      if (!dirtyPath) return null;
+      if (!mediaDb) return null;
 
       var path = MediaHandler.normalizeMediaPath(dirtyPath);
-      if(!path) return null;
-      var ext = '.' + path.split('.').pop();
-      if(ext.length >= 7) ext = '';
+      if (!path) return null;
+      var ext = "." + path.split(".").pop();
+      if (ext.length >= 7) ext = "";
 
-      var shaBuf = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(path));
-      var shaHex = Array.from(new Uint8Array(shaBuf))
-                          .map(b => b.toString(16).padStart(2,'0'))
-                          .join('') + ext;
+      var shaBuf = await crypto.subtle.digest(
+        "SHA-1",
+        new TextEncoder().encode(path)
+      );
+      var shaHex =
+        Array.from(new Uint8Array(shaBuf))
+          .map((b) => b.toString(16).padStart(2, "0"))
+          .join("") + ext;
 
-      if(!mediaReverseMap.has(shaHex)) {
+      if (!mediaReverseMap.has(shaHex)) {
         var blob = await MediaHandler.getBlobFromMediaCache(mediaDb, shaHex);
-        if(!blob) return null;
+        if (!blob) return null;
 
         zip.file(String(nextMediaIndex), blob);
         mediaReverseMap.set(shaHex, String(nextMediaIndex));
@@ -2982,39 +3283,57 @@ const ExportProcessor = {
     }
 
     var totalCards = 0;
-    for(const l of cardsByType.values()) totalCards += l.length;
+    for (const l of cardsByType.values()) totalCards += l.length;
     var processed = 0;
 
-    if(totalCards > 0) Progress.show('Converting cards...', 0);
-    else Progress.show('No cards to convert', 100);
+    if (totalCards > 0) Progress.show("Converting cards...", 0);
+    else Progress.show("No cards to convert", 100);
 
-    ankiDb.run('BEGIN TRANSACTION;');
+    ankiDb.run("BEGIN TRANSACTION;");
 
-    for(const typeKey of cardsByType.keys()) {
+    for (const typeKey of cardsByType.keys()) {
       var modelId = modelMapping.get(typeKey);
       var list = cardsByType.get(typeKey);
       var ct = cardTypes.get(typeKey);
 
-      for(const card of list) {
+      for (const card of list) {
         var finalFieldValues = await FieldMapper.buildFieldValues(
-          card, ct, settings, ensureMediaInZip
+          card,
+          ct,
+          settings,
+          ensureMediaInZip
         );
 
-        var fieldsStr = finalFieldValues.join('\x1F');
-        var shaBuf = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(fieldsStr));
+        var fieldsStr = finalFieldValues.join("\x1F");
+        var shaBuf = await crypto.subtle.digest(
+          "SHA-1",
+          new TextEncoder().encode(fieldsStr)
+        );
         var shaHex = Array.from(new Uint8Array(shaBuf))
-                            .map(b => b.toString(16).padStart(2,'0'))
-                            .join('');
-        var fieldsChecksum = parseInt(shaHex.substring(0,8), 16);
+          .map((b) => b.toString(16).padStart(2, "0"))
+          .join("");
+        var fieldsChecksum = parseInt(shaHex.substring(0, 8), 16);
 
         try {
-          ankiDb.run('INSERT INTO notes VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [
-            card.id, Utils.createUUID(), modelId, card.mod, -1, '',
-            fieldsStr, 0, fieldsChecksum, 0, ''
-          ]);
+          ankiDb.run(
+            "INSERT INTO notes VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [
+              card.id,
+              Utils.createUUID(),
+              modelId,
+              card.mod,
+              -1,
+              "",
+              fieldsStr,
+              0,
+              fieldsChecksum,
+              0,
+              "",
+            ]
+          );
         } catch (err) {
-          console.error('Note insert failed:', err);
-          Utils.setStatus(`Card insert failed: ${err.message}`, '#ef4444');
+          console.error("Note insert failed:", err);
+          Utils.setStatus(`Card insert failed: ${err.message}`, "#ef4444");
           continue;
         }
 
@@ -3037,7 +3356,7 @@ const ExportProcessor = {
         var NOW = new Date();
         NOW.setHours(0, 0, 0, 0); // Normalize to midnight
 
-        if(cardTypeNum === 0) {
+        if (cardTypeNum === 0) {
           // new cards - due is position in new queue
           due = card.due || 0;
           interval = 0;
@@ -3045,44 +3364,78 @@ const ExportProcessor = {
           // review cards - due is days from NOW (collection creation time)
           // Migaku stores due as days since Jan 1, 2020
           var migakuDueDays = card.due;
-          var dueDate = new Date(MIGAKU_EPOCH.getTime() + (migakuDueDays * 24 * 60 * 60 * 1000));
+          var dueDate = new Date(
+            MIGAKU_EPOCH.getTime() + migakuDueDays * 24 * 60 * 60 * 1000
+          );
 
           // calculate days between now (at midnight) and the due date
-          var daysFromNow = Math.round((dueDate.getTime() - NOW.getTime()) / (24 * 60 * 60 * 1000));
+          var daysFromNow = Math.round(
+            (dueDate.getTime() - NOW.getTime()) / (24 * 60 * 60 * 1000)
+          );
           due = daysFromNow;
 
           // Calculate the actual interval based on when card was last reviewed
           // Migaku stores lastReview as days since epoch
           if (card.lastReview && card.lastReview > 0) {
-            var lastReviewDate = new Date(MIGAKU_EPOCH.getTime() + (card.lastReview * 24 * 60 * 60 * 1000));
+            var lastReviewDate = new Date(
+              MIGAKU_EPOCH.getTime() + card.lastReview * 24 * 60 * 60 * 1000
+            );
             // Interval = days between last review and due date
-            interval = Math.round((dueDate.getTime() - lastReviewDate.getTime()) / (24 * 60 * 60 * 1000));
+            interval = Math.round(
+              (dueDate.getTime() - lastReviewDate.getTime()) /
+                (24 * 60 * 60 * 1000)
+            );
           } else {
             // Fallback to Migaku's interval if no lastReview
             interval = Math.floor(card.interval);
           }
 
-          if(processed < 3) {
-            Utils.log(`Card ${card.id}: migaku due=${migakuDueDays}, due date=${dueDate.toISOString()}, days from now=${daysFromNow}, lastReview=${card.lastReview}, calculated interval=${interval} days`);
+          if (processed < 3) {
+            Utils.log(
+              `Card ${card.id}: migaku due=${migakuDueDays}, due date=${dueDate.toISOString()}, days from now=${daysFromNow}, lastReview=${card.lastReview}, calculated interval=${interval} days`
+            );
           }
         }
 
-        ankiDb.run('INSERT INTO cards VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [
-          card.id, card.id, 1, 0, card.mod, -1, cardTypeNum, cardQueueNum, due,
-          interval, Math.floor(card.factor * 1000),
-          card.reviewCount, card.failCount, 0, 0, 0, 0, ''
-        ]);
+        ankiDb.run(
+          "INSERT INTO cards VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          [
+            card.id,
+            card.id,
+            1,
+            0,
+            card.mod,
+            -1,
+            cardTypeNum,
+            cardQueueNum,
+            due,
+            interval,
+            Math.floor(card.factor * 1000),
+            card.reviewCount,
+            card.failCount,
+            0,
+            0,
+            0,
+            0,
+            "",
+          ]
+        );
 
         processed++;
-        Progress.set((processed / Math.max(1, totalCards)) * 100,
-                    `Converting cards – ${processed}/${totalCards}`);
+        Progress.set(
+          (processed / Math.max(1, totalCards)) * 100,
+          `Converting cards – ${processed}/${totalCards}`
+        );
       }
     }
 
-    ankiDb.run('COMMIT');
+    ankiDb.run("COMMIT");
 
-    var inverted = Array.from(mediaReverseMap.entries()).map(([sha, idx]) => [idx, sha]);
-    zip.file('media', JSON.stringify(Object.fromEntries(inverted)));
+    var inverted = Array.from(mediaReverseMap.entries()).map(([sha, idx]) => [
+      idx,
+      sha,
+    ]);
+    zip.file("media", JSON.stringify(Object.fromEntries(inverted)));
 
     Progress.set(100, "Cards converted");
     await Utils.sleep(120);
@@ -3090,13 +3443,15 @@ const ExportProcessor = {
   },
 
   async buildApkgsForSelection(SQL, db, selectedIds, decks, options, mappings) {
-    if(!SQL || !SQL.Database) {
+    if (!SQL || !SQL.Database) {
       throw new Error("SQL.js runtime not provided");
     }
 
     var allCards = [];
     for (const id of selectedIds) {
-      allCards = allCards.concat(DatabaseOps.listCardsForDeck(db, id).filter(x => !x.del));
+      allCards = allCards.concat(
+        DatabaseOps.listCardsForDeck(db, id).filter((x) => !x.del)
+      );
     }
 
     var cardTypes = DatabaseOps.readCardTypes(db);
@@ -3106,7 +3461,9 @@ const ExportProcessor = {
       cardsByType.get(c.cardTypeId).push(c);
     }
 
-    var usedCardTypes = Array.from(cardsByType.keys()).map(k => cardTypes.get(k));
+    var usedCardTypes = Array.from(cardsByType.keys()).map((k) =>
+      cardTypes.get(k)
+    );
     if (DeckProtection.checkForbiddenContent(usedCardTypes)) {
       var msg = DeckProtection.getForbiddenMessage();
       Utils.setStatus(msg, "#ef4444");
@@ -3114,44 +3471,59 @@ const ExportProcessor = {
     }
 
     if (options.mergeSelected) {
-      var mergedName = "Merged - " + selectedIds.map(id =>
-        (decks.find(d => String(d.id) === String(id))?.name || id)
-      ).join(" + ");
+      var mergedName =
+        "Merged - " +
+        selectedIds
+          .map(
+            (id) => decks.find((d) => String(d.id) === String(id))?.name || id
+          )
+          .join(" + ");
 
       Utils.setStatus(`Building merged APKG: ${mergedName}`);
       Progress.show("Preparing merged package...", 0);
 
       var mediaDb = await MediaHandler.openLocalMediaCacheDb();
       if (options.includeMedia && mediaDb) {
-        await MediaHandler.gatherMediaFiles(mediaDb, cardsByType, cardTypes, options);
+        await MediaHandler.gatherMediaFiles(
+          mediaDb,
+          cardsByType,
+          cardTypes,
+          options
+        );
       }
 
       var zip = new JSZip();
       var ankiDb = AnkiBuilder.createEmptyAnkiDb(SQL);
       // Only include reviews for cards being exported
-      var cardIds = new Set(allCards.map(c => c.id));
+      var cardIds = new Set(allCards.map((c) => c.id));
 
       // Get reviewHistory days - Migaku only shows stats for days in this table
       const reviewHistoryDays = new Set();
       try {
-        const historyRows = DatabaseOps.runQueryToObjects(db, "SELECT day FROM reviewHistory WHERE del = 0");
-        historyRows.forEach(row => reviewHistoryDays.add(row.day));
-        Utils.log(`Found ${reviewHistoryDays.size} days in reviewHistory table`);
+        const historyRows = DatabaseOps.runQueryToObjects(
+          db,
+          "SELECT day FROM reviewHistory WHERE del = 0"
+        );
+        historyRows.forEach((row) => reviewHistoryDays.add(row.day));
+        Utils.log(
+          `Found ${reviewHistoryDays.size} days in reviewHistory table`
+        );
       } catch (e) {
         Utils.log(`No reviewHistory table or error:`, e);
       }
 
       // Filter reviews: only cards in this deck AND days that exist in reviewHistory
-      const reviews = DatabaseOps.listReviewHistory(db).filter(x =>
-        !x.del &&
-        cardIds.has(x.cardId) &&
-        (reviewHistoryDays.size === 0 || reviewHistoryDays.has(x.day))
+      const reviews = DatabaseOps.listReviewHistory(db).filter(
+        (x) =>
+          !x.del &&
+          cardIds.has(x.cardId) &&
+          (reviewHistoryDays.size === 0 || reviewHistoryDays.has(x.day))
       );
 
       // Debug: Log review counts by type
       const reviewsByType = { 0: 0, 1: 0, 2: 0 };
       const reviewsByDay = new Map(); // Track unique cards per day
-      reviews.forEach(r => {
+      reviews.forEach((r) => {
         reviewsByType[r.type] = (reviewsByType[r.type] || 0) + 1;
         const dayKey = `${r.day}-${r.type}`;
         if (!reviewsByDay.has(dayKey)) {
@@ -3162,19 +3534,40 @@ const ExportProcessor = {
 
       Utils.log(`=== REVIEW DEBUG INFO ===`);
       Utils.log(`Total review records: ${reviews.length}`);
-      Utils.log(`By type - New(0): ${reviewsByType[0]}, Fail(1): ${reviewsByType[1]}, Pass(2): ${reviewsByType[2]}`);
+      Utils.log(
+        `By type - New(0): ${reviewsByType[0]}, Fail(1): ${reviewsByType[1]}, Pass(2): ${reviewsByType[2]}`
+      );
 
       // Count unique cards per type across all days (matching Migaku's COUNT DISTINCT)
       const uniqueCardsByType = { 0: new Set(), 1: new Set(), 2: new Set() };
-      reviews.forEach(r => uniqueCardsByType[r.type].add(`${r.cardId}-${r.day}`));
-      Utils.log(`Unique card-day combinations - New(0): ${uniqueCardsByType[0].size}, Fail(1): ${uniqueCardsByType[1].size}, Pass(2): ${uniqueCardsByType[2].size}`);
+      reviews.forEach((r) =>
+        uniqueCardsByType[r.type].add(`${r.cardId}-${r.day}`)
+      );
+      Utils.log(
+        `Unique card-day combinations - New(0): ${uniqueCardsByType[0].size}, Fail(1): ${uniqueCardsByType[1].size}, Pass(2): ${uniqueCardsByType[2].size}`
+      );
       Utils.log(`^^^ This should match what Migaku shows! ^^^`);
-      Utils.log(`If Migaku shows exactly HALF these numbers, we'll just divide by 2.`);
+      Utils.log(
+        `If Migaku shows exactly HALF these numbers, we'll just divide by 2.`
+      );
 
       AnkiBuilder.fillRevlogTable(ankiDb, reviews);
 
-      const modelMap = AnkiBuilder.insertCollectionMetadata(ankiDb, usedCardTypes, mappings, options.useTemplates);
-      await ExportProcessor.fillNotesAndCards(ankiDb, mediaDb, zip, cardsByType, cardTypes, modelMap, options);
+      const modelMap = AnkiBuilder.insertCollectionMetadata(
+        ankiDb,
+        usedCardTypes,
+        mappings,
+        options.useTemplates
+      );
+      await ExportProcessor.fillNotesAndCards(
+        ankiDb,
+        mediaDb,
+        zip,
+        cardsByType,
+        cardTypes,
+        modelMap,
+        options
+      );
 
       const exported = ankiDb.export();
       zip.file("collection.anki2", exported);
@@ -3193,19 +3586,28 @@ const ExportProcessor = {
     } else {
       for (let i = 0; i < selectedIds.length; i++) {
         var id = selectedIds[i];
-        var deckInfo = decks.find(d => String(d.id) === String(id));
+        var deckInfo = decks.find((d) => String(d.id) === String(id));
         var deckName = deckInfo ? deckInfo.name : `deck-${id}`;
 
-        Utils.setStatus(`Exporting (${i+1}/${selectedIds.length}) – ${deckName} ...`, "#f59e0b");
+        Utils.setStatus(
+          `Exporting (${i + 1}/${selectedIds.length}) – ${deckName} ...`,
+          "#f59e0b"
+        );
         Progress.show(`Preparing ${deckName}`, 0);
 
-      var allCards = DatabaseOps.listCardsForDeck(db, id).filter(x => !x.del);
-      var cardsByTypeIndividual = new Map();
+        var allCards = DatabaseOps.listCardsForDeck(db, id).filter(
+          (x) => !x.del
+        );
+        var cardsByTypeIndividual = new Map();
 
-      for (const c of allCards) {
-        if(!cardsByTypeIndividual.has(c.cardTypeId)) cardsByTypeIndividual.set(c.cardTypeId, []);
-        cardsByTypeIndividual.get(c.cardTypeId).push(c);
-      }        var individualCardTypes = Array.from(cardsByTypeIndividual.keys()).map(k => cardTypes.get(k));
+        for (const c of allCards) {
+          if (!cardsByTypeIndividual.has(c.cardTypeId))
+            cardsByTypeIndividual.set(c.cardTypeId, []);
+          cardsByTypeIndividual.get(c.cardTypeId).push(c);
+        }
+        var individualCardTypes = Array.from(cardsByTypeIndividual.keys()).map(
+          (k) => cardTypes.get(k)
+        );
         if (DeckProtection.checkForbiddenContent(individualCardTypes)) {
           var msg = DeckProtection.getForbiddenMessage();
           Utils.setStatus(msg, "#ef4444");
@@ -3214,33 +3616,55 @@ const ExportProcessor = {
 
         var mediaDb = await MediaHandler.openLocalMediaCacheDb();
         if (options.includeMedia && mediaDb) {
-          await MediaHandler.gatherMediaFiles(mediaDb, cardsByTypeIndividual, cardTypes, options);
+          await MediaHandler.gatherMediaFiles(
+            mediaDb,
+            cardsByTypeIndividual,
+            cardTypes,
+            options
+          );
         }
 
         var zip = new JSZip();
         var ankiDb = AnkiBuilder.createEmptyAnkiDb(SQL);
         // Only include reviews for cards being exported
-        var cardIds = new Set(allCards.map(c => c.id));
+        var cardIds = new Set(allCards.map((c) => c.id));
 
         // Get reviewHistory days
         var reviewHistoryDays = new Set();
         try {
-          var historyRows = DatabaseOps.runQueryToObjects(db, "SELECT day FROM reviewHistory WHERE del = 0");
-          historyRows.forEach(row => reviewHistoryDays.add(row.day));
+          var historyRows = DatabaseOps.runQueryToObjects(
+            db,
+            "SELECT day FROM reviewHistory WHERE del = 0"
+          );
+          historyRows.forEach((row) => reviewHistoryDays.add(row.day));
         } catch (e) {
           // reviewHistory table might not exist
         }
 
         // Filter reviews to only cards in this deck AND days in reviewHistory
-        const reviews = DatabaseOps.listReviewHistory(db).filter(x =>
-          !x.del &&
-          cardIds.has(x.cardId) &&
-          (reviewHistoryDays.size === 0 || reviewHistoryDays.has(x.day))
+        const reviews = DatabaseOps.listReviewHistory(db).filter(
+          (x) =>
+            !x.del &&
+            cardIds.has(x.cardId) &&
+            (reviewHistoryDays.size === 0 || reviewHistoryDays.has(x.day))
         );
         AnkiBuilder.fillRevlogTable(ankiDb, reviews);
 
-        const modelMap = AnkiBuilder.insertCollectionMetadata(ankiDb, individualCardTypes, mappings, options.useTemplates);
-        await ExportProcessor.fillNotesAndCards(ankiDb, mediaDb, zip, cardsByTypeIndividual, cardTypes, modelMap, options);
+        const modelMap = AnkiBuilder.insertCollectionMetadata(
+          ankiDb,
+          individualCardTypes,
+          mappings,
+          options.useTemplates
+        );
+        await ExportProcessor.fillNotesAndCards(
+          ankiDb,
+          mediaDb,
+          zip,
+          cardsByTypeIndividual,
+          cardTypes,
+          modelMap,
+          options
+        );
 
         const exported = ankiDb.export();
         zip.file("collection.anki2", exported);
@@ -3248,14 +3672,23 @@ const ExportProcessor = {
 
         const blob = await zip.generateAsync({ type: "blob" }, (meta) => {
           if (meta && typeof meta.percent === "number") {
-            Progress.set(meta.percent, `Zipping – ${Math.round(meta.percent)}%`);
+            Progress.set(
+              meta.percent,
+              `Zipping – ${Math.round(meta.percent)}%`
+            );
           }
         });
 
         const name = `Migaku - ${deckName}.apkg`;
         ExportProcessor.downloadBlob(blob, name);
-        Utils.setStatus(`Exported (${i+1}/${selectedIds.length}) – ${deckName}`, "#10b981");
-        Progress.set(((i+1)/selectedIds.length)*100, `Overall progress – ${i+1}/${selectedIds.length} exported`);
+        Utils.setStatus(
+          `Exported (${i + 1}/${selectedIds.length}) – ${deckName}`,
+          "#10b981"
+        );
+        Progress.set(
+          ((i + 1) / selectedIds.length) * 100,
+          `Overall progress – ${i + 1}/${selectedIds.length} exported`
+        );
 
         await Utils.sleep(200);
       }
@@ -3283,7 +3716,8 @@ const ExportProcessor = {
       let wl;
       if (!language) {
         Utils.log("No language specified, getting all word lists");
-        wl = DatabaseOps.runQueryToObjects(db,
+        wl = DatabaseOps.runQueryToObjects(
+          db,
           "SELECT dictForm, secondary, partOfSpeech, language, mod, serverMod, del, knownStatus, hasCard, tracked FROM WordList"
         );
       } else {
@@ -3292,26 +3726,44 @@ const ExportProcessor = {
 
       Utils.log(`Found ${wl.length} words in wordlist`);
 
-      const unknown = [], ignored = [], learning = [], known = [], tracked = [];
+      const unknown = [],
+        ignored = [],
+        learning = [],
+        known = [],
+        tracked = [];
 
       for (const w of wl) {
         if (w.del) continue;
         switch (w.knownStatus) {
-          case "UNKNOWN": unknown.push(w); break;
-          case "IGNORED": ignored.push(w); break;
-          case "LEARNING": learning.push(w); break;
-          case "KNOWN": known.push(w); break;
-          default: console.log("unknown status", w.knownStatus); break;
+          case "UNKNOWN":
+            unknown.push(w);
+            break;
+          case "IGNORED":
+            ignored.push(w);
+            break;
+          case "LEARNING":
+            learning.push(w);
+            break;
+          case "KNOWN":
+            known.push(w);
+            break;
+          default:
+            console.log("unknown status", w.knownStatus);
+            break;
         }
         if (w.tracked) tracked.push(w);
       }
 
-      Utils.log(`Wordlist counts - Unknown: ${unknown.length}, Ignored: ${ignored.length}, Learning: ${learning.length}, Known: ${known.length}, Tracked: ${tracked.length}`);
+      Utils.log(
+        `Wordlist counts - Unknown: ${unknown.length}, Ignored: ${ignored.length}, Learning: ${learning.length}, Known: ${known.length}, Tracked: ${tracked.length}`
+      );
 
-      const q = (s) => `"${(s || "").replaceAll('"','""')}"`;
+      const q = (s) => `"${(s || "").replaceAll('"', '""')}"`;
       const toCsv = (arr) => {
         const header = "dictForm,secondary,hasCard";
-        const rows = arr.map(x => `${q(x.dictForm)},${q(x.secondary)},${x.hasCard}`);
+        const rows = arr.map(
+          (x) => `${q(x.dictForm)},${q(x.secondary)},${x.hasCard}`
+        );
         return header + "\n" + rows.join("\n");
       };
 
@@ -3325,7 +3777,10 @@ const ExportProcessor = {
       Progress.set(0, "Zipping wordlists...");
       const blob = await zip.generateAsync({ type: "blob" }, (meta) => {
         if (meta && meta.percent) {
-          Progress.set(meta.percent, `Zipping wordlists – ${Math.round(meta.percent)}%`);
+          Progress.set(
+            meta.percent,
+            `Zipping wordlists – ${Math.round(meta.percent)}%`
+          );
         }
       });
 
@@ -3337,7 +3792,7 @@ const ExportProcessor = {
       Utils.setStatus("Wordlist export failed – see console", "#ef4444");
       Progress.hide();
     }
-  }
+  },
 };
 
 // UI setup - all the CSS and modal stuff
@@ -4271,7 +4726,9 @@ const UI = {
   },
 
   injectExportIntoMemoryPlusMenu: () => {
-    const actionSheet = document.querySelector(".UiPopover.-visible .UiActionSheet.-desktop");
+    const actionSheet = document.querySelector(
+      ".UiPopover.-visible .UiActionSheet.-desktop"
+    );
     if (!actionSheet) return false;
     if (actionSheet.querySelector("#mgkExportToAnkiAction")) return true;
 
@@ -4315,7 +4772,10 @@ const UI = {
       UI.injectExportIntoMemoryPlusMenu();
     });
 
-    UI.memoryMenuObserver.observe(document.body, { childList: true, subtree: true });
+    UI.memoryMenuObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
     UI.injectExportIntoMemoryPlusMenu();
   },
 
@@ -4323,7 +4783,10 @@ const UI = {
     UI.injectStyles();
     MappingModal.create();
 
-    if (!Utils.safeGetElement("mgkModalBackdrop") || !Utils.safeGetElement(CONFIG.MODAL_ID)) {
+    if (
+      !Utils.safeGetElement("mgkModalBackdrop") ||
+      !Utils.safeGetElement(CONFIG.MODAL_ID)
+    ) {
       UI.createExportModal();
     }
 
@@ -4504,12 +4967,14 @@ const UI = {
     document.body.appendChild(backdrop);
     UI.setNativeSkin();
 
-
-    Utils.safeAddListener(Utils.safeGetElement("mgkCloseBtn"), "click", UI.hideMainModal);
+    Utils.safeAddListener(
+      Utils.safeGetElement("mgkCloseBtn"),
+      "click",
+      UI.hideMainModal
+    );
     Utils.safeAddListener(backdrop, "click", (e) => {
       if (e.target === backdrop) UI.hideMainModal();
     });
-
 
     const mediaBtn = Utils.safeGetElement("mgkMediaBtn");
     const mediaPopup = Utils.safeGetElement("mgkMediaPopup");
@@ -4523,7 +4988,11 @@ const UI = {
       e.stopPropagation();
       toggleMediaPopup(true);
     });
-    Utils.safeAddListener(Utils.safeGetElement("mgkMediaPopupClose"), "click", () => toggleMediaPopup(false));
+    Utils.safeAddListener(
+      Utils.safeGetElement("mgkMediaPopupClose"),
+      "click",
+      () => toggleMediaPopup(false)
+    );
 
     document.addEventListener("click", (e) => {
       const popup = Utils.safeGetElement("mgkMediaPopup");
@@ -4533,7 +5002,6 @@ const UI = {
         popup.classList.remove("show");
       }
     });
-
 
     const presetRoot = Utils.safeGetElement("mgkPresetRoot");
     const presetToggle = Utils.safeGetElement("mgkPresetToggle");
@@ -4569,12 +5037,12 @@ const UI = {
       }
     });
 
-
     const simpleToggle = Utils.safeGetElement("mgkSimpleMode");
     function updateModeUI() {
       const simple = simpleToggle?.checked ?? true;
       const modeLabel = Utils.safeGetElement("mgkModeLabel");
-      if (modeLabel) modeLabel.innerText = simple ? "Mode: Simple" : "Mode: Advanced";
+      if (modeLabel)
+        modeLabel.innerText = simple ? "Mode: Simple" : "Mode: Advanced";
 
       const simplified = Utils.safeGetElement("mgkSimplifiedArea");
       const advanced = Utils.safeGetElement("mgkAdvancedArea");
@@ -4609,10 +5077,13 @@ const UI = {
     // UI.setNativeSkin(nativeSkinToggle?.checked ?? false);
     UI.setNativeSkin();
 
-
-    Utils.safeAddListener(Utils.safeGetElement("mgkOpenMappingsBtn"), "click", () => {
-      MappingModal.open();
-    });
+    Utils.safeAddListener(
+      Utils.safeGetElement("mgkOpenMappingsBtn"),
+      "click",
+      () => {
+        MappingModal.open();
+      }
+    );
   },
 
   showMainModal: () => {
@@ -4643,18 +5114,22 @@ const UI = {
     const badge = Utils.safeGetElement("mgkSelectedBadge");
     if (!listEl || !searchEl || !badge) return;
 
-    const items = decks.filter(d => !d.del).map(d => ({
-      id: d.id,
-      name: d.name,
-      lang: d.lang
-    }));
+    const items = decks
+      .filter((d) => !d.del)
+      .map((d) => ({
+        id: d.id,
+        name: d.name,
+        lang: d.lang,
+      }));
     let selected = new Set();
     // Populate language dropdown
     if (languageFilterEl) {
-      const languages = [...new Set(items.map(d => d.lang).filter(Boolean))].sort();
+      const languages = [
+        ...new Set(items.map((d) => d.lang).filter(Boolean)),
+      ].sort();
       languageFilterEl.innerHTML = '<option value="">All Languages</option>';
-      languages.forEach(lang => {
-        const option = document.createElement('option');
+      languages.forEach((lang) => {
+        const option = document.createElement("option");
         option.value = lang;
         option.textContent = lang;
         if (lang === currentLanguage) option.selected = true;
@@ -4667,7 +5142,7 @@ const UI = {
         badge.innerText = "No deck selected";
       } else if (selected.size === 1) {
         const id = Array.from(selected)[0];
-        const found = items.find(x => String(x.id) === String(id));
+        const found = items.find((x) => String(x.id) === String(id));
         badge.innerText = found ? found.name : `${selected.size} selected`;
       } else {
         badge.innerText = `${selected.size} decks selected`;
@@ -4676,14 +5151,15 @@ const UI = {
     }
 
     function render(filter = "") {
-      const languageFilter = Utils.safeGetElement("mgkLanguageFilter")?.value || null;
+      const languageFilter =
+        Utils.safeGetElement("mgkLanguageFilter")?.value || null;
       listEl.innerHTML = "";
       const q = (filter || "").toLowerCase().trim();
-      let filtered = items.filter(it => it.name.toLowerCase().includes(q));
+      let filtered = items.filter((it) => it.name.toLowerCase().includes(q));
 
       // Apply language filter
       if (languageFilter) {
-        filtered = filtered.filter(it => it.lang === languageFilter);
+        filtered = filtered.filter((it) => it.lang === languageFilter);
       }
 
       if (filtered.length === 0) {
@@ -4691,20 +5167,16 @@ const UI = {
         return;
       }
 
-
       const decksByLang = {};
-      filtered.forEach(deck => {
-        const lang = deck.lang || 'Unknown';
+      filtered.forEach((deck) => {
+        const lang = deck.lang || "Unknown";
         if (!decksByLang[lang]) decksByLang[lang] = [];
         decksByLang[lang].push(deck);
       });
 
-
       const sortedLanguages = Object.keys(decksByLang).sort();
 
-
-      sortedLanguages.forEach(language => {
-
+      sortedLanguages.forEach((language) => {
         const header = document.createElement("div");
         header.style.cssText = `
           padding: 12px 16px;
@@ -4719,8 +5191,7 @@ const UI = {
         header.textContent = language;
         listEl.appendChild(header);
 
-
-        decksByLang[language].forEach(deck => {
+        decksByLang[language].forEach((deck) => {
           const li = document.createElement("div");
           li.className = "mgk-list-inner-item";
           li.tabIndex = 0;
@@ -4747,14 +5218,14 @@ const UI = {
             if (ev.key === "ArrowDown") {
               ev.preventDefault();
               const next = li.nextElementSibling;
-              if (next && next.classList.contains('mgk-list-inner-item')) {
+              if (next && next.classList.contains("mgk-list-inner-item")) {
                 next.focus();
               }
             }
             if (ev.key === "ArrowUp") {
               ev.preventDefault();
               const prev = li.previousElementSibling;
-              if (prev && prev.classList.contains('mgk-list-inner-item')) {
+              if (prev && prev.classList.contains("mgk-list-inner-item")) {
                 prev.focus();
               }
             }
@@ -4772,22 +5243,22 @@ const UI = {
       if (show === undefined) show = !open;
       open = show;
       if (open) {
-        listEl.style.setProperty('display', 'block');
-        listEl.style.position = 'absolute';
-        listEl.style.visibility = 'hidden';
-        await new Promise(r => requestAnimationFrame(r));
+        listEl.style.setProperty("display", "block");
+        listEl.style.position = "absolute";
+        listEl.style.visibility = "hidden";
+        await new Promise((r) => requestAnimationFrame(r));
         let measured = listEl.scrollHeight || 280;
         const maxH = 360;
         if (measured > maxH) measured = maxH;
-        listEl.style.position = '';
-        listEl.style.visibility = '';
-        listEl.style.setProperty('--mgk-list-height', `${measured}px`);
-        listEl.classList.add('show');
+        listEl.style.position = "";
+        listEl.style.visibility = "";
+        listEl.style.setProperty("--mgk-list-height", `${measured}px`);
+        listEl.classList.add("show");
       } else {
-        listEl.classList.remove('show');
+        listEl.classList.remove("show");
         setTimeout(() => {
-          listEl.style.removeProperty('--mgk-list-height');
-          listEl.style.display = '';
+          listEl.style.removeProperty("--mgk-list-height");
+          listEl.style.display = "";
         }, 300);
       }
     }
@@ -4816,17 +5287,21 @@ const UI = {
       });
     }
 
-    document.addEventListener("click", (e) => {
-      const root = Utils.safeGetElement("mgkDeckList")?.parentElement;
-      if (!root) return;
-      if (!root.contains(e.target)) toggleList(false);
-    }, { capture: true });
+    document.addEventListener(
+      "click",
+      (e) => {
+        const root = Utils.safeGetElement("mgkDeckList")?.parentElement;
+        if (!root) return;
+        if (!root.contains(e.target)) toggleList(false);
+      },
+      { capture: true }
+    );
 
     window.migakuDropdown = {
       items,
       selected,
       selectAll: () => {
-        items.forEach(it => selected.add(String(it.id)));
+        items.forEach((it) => selected.add(String(it.id)));
         render(searchEl?.value || "");
         updateBadgeAndHidden();
       },
@@ -4834,7 +5309,7 @@ const UI = {
         selected.clear();
         render(searchEl?.value || "");
         updateBadgeAndHidden();
-      }
+      },
     };
   },
 
@@ -4850,7 +5325,11 @@ const UI = {
       fabMenu.parentNode.removeChild(fabMenu);
     }
 
-    if (exportAction && exportAction.parentNode && exportAction.parentNode.parentNode) {
+    if (
+      exportAction &&
+      exportAction.parentNode &&
+      exportAction.parentNode.parentNode
+    ) {
       exportAction.parentNode.parentNode.removeChild(exportAction.parentNode);
     }
 
@@ -4858,15 +5337,17 @@ const UI = {
       UI.memoryMenuObserver.disconnect();
       UI.memoryMenuObserver = null;
     }
-  }
+  },
 };
 
 // Route monitoring (copied from stats.js pattern)
 function handleRouteChange() {
   const path = window.location.pathname || "";
-  const isRootPath = path === '/' || path === '';
+  const isRootPath = path === "/" || path === "";
   const isMemoryRoute = path.toLowerCase().includes("memory");
-  const hasHomePlusButton = !!document.querySelector("button.HomePlusButton__button, button[aria-label='ID:HomePlusButton.open']");
+  const hasHomePlusButton = !!document.querySelector(
+    "button.HomePlusButton__button, button[aria-label='ID:HomePlusButton.open']"
+  );
 
   if (isRootPath || isMemoryRoute || hasHomePlusButton) {
     UI.createMainUI();
@@ -4879,13 +5360,13 @@ function monkeyPatchHistoryMethods() {
   const originalPushState = history.pushState;
   const originalReplaceState = history.replaceState;
 
-  history.pushState = function(...args) {
+  history.pushState = function (...args) {
     const ret = originalPushState.apply(this, args);
     window.dispatchEvent(new Event("locationchange"));
     return ret;
   };
 
-  history.replaceState = function(...args) {
+  history.replaceState = function (...args) {
     const ret = originalReplaceState.apply(this, args);
     window.dispatchEvent(new Event("locationchange"));
     return ret;
@@ -4909,34 +5390,34 @@ const TutorialManager = {
   STEPS: [
     {
       sel: 'button.HomePlusButton__button, button[aria-label="ID:HomePlusButton.open"]',
-      text: 'Welcome! First, click the <strong>+ button</strong> in the bottom-right to open the Memory menu.',
-      pos: 'top',
-      advance: 'click',
+      text: "Welcome! First, click the <strong>+ button</strong> in the bottom-right to open the Memory menu.",
+      pos: "top",
+      advance: "click",
     },
     {
-      sel: '#mgkExportToAnkiAction',
-      text: 'Now click <strong>Export to Anki</strong> in the menu.',
-      pos: 'left',
-      advance: 'click',
+      sel: "#mgkExportToAnkiAction",
+      text: "Now click <strong>Export to Anki</strong> in the menu.",
+      pos: "left",
+      advance: "click",
     },
     {
-      sel: '#mgkDeckSection',
-      text: 'Select a <strong>deck</strong> from the list to export.',
-      pos: 'right',
-      advance: 'child',
-      childSel: '.mgk-list-inner-item',
+      sel: "#mgkDeckSection",
+      text: "Select a <strong>deck</strong> from the list to export.",
+      pos: "right",
+      advance: "child",
+      childSel: ".mgk-list-inner-item",
     },
     {
-      sel: '#mgkExportDeckBtn',
-      text: 'Click <strong>Export selected decks</strong> to generate your Anki .apkg file.',
-      pos: 'top',
-      advance: 'click',
+      sel: "#mgkExportDeckBtn",
+      text: "Click <strong>Export selected decks</strong> to generate your Anki .apkg file.",
+      pos: "top",
+      advance: "click",
     },
     {
-      sel: 'label:has(#mgkSimpleMode) .mgk-toggle-track',
-      text: 'You can toggle between <strong>Simple</strong> and <strong>Advanced</strong> mode here for more export options.',
-      pos: 'bottom',
-      advance: 'gotit',
+      sel: "label:has(#mgkSimpleMode) .mgk-toggle-track",
+      text: "You can toggle between <strong>Simple</strong> and <strong>Advanced</strong> mode here for more export options.",
+      pos: "bottom",
+      advance: "gotit",
     },
   ],
 
@@ -4947,10 +5428,13 @@ const TutorialManager = {
 
   start() {
     TutorialManager._step = 0;
-    if (!document.getElementById('mgkTutorialOverlay')) {
-      const ov = document.createElement('div'); ov.id = 'mgkTutorialOverlay';
-      const sp = document.createElement('div'); sp.id = 'mgkTutorialSpotlight';
-      const tt = document.createElement('div'); tt.id = 'mgkTutorialTooltip';
+    if (!document.getElementById("mgkTutorialOverlay")) {
+      const ov = document.createElement("div");
+      ov.id = "mgkTutorialOverlay";
+      const sp = document.createElement("div");
+      sp.id = "mgkTutorialSpotlight";
+      const tt = document.createElement("div");
+      tt.id = "mgkTutorialTooltip";
       document.body.append(ov, sp, tt);
     }
     TutorialManager._goToStep(0);
@@ -4959,17 +5443,23 @@ const TutorialManager = {
   _goToStep(n) {
     clearTimeout(TutorialManager._pendingTimer);
     // Hide spotlight during transition so it doesn't shadow popover/modal
-    const sp = document.getElementById('mgkTutorialSpotlight');
-    if (sp) sp.style.opacity = '0';
+    const sp = document.getElementById("mgkTutorialSpotlight");
+    if (sp) sp.style.opacity = "0";
     const step = TutorialManager.STEPS[n];
-    if (!step) { TutorialManager.finish(); return; }
+    if (!step) {
+      TutorialManager.finish();
+      return;
+    }
 
     const tryAttach = () => {
       const el = document.querySelector(step.sel);
-      if (!el) { TutorialManager._pendingTimer = setTimeout(tryAttach, 350); return; }
+      if (!el) {
+        TutorialManager._pendingTimer = setTimeout(tryAttach, 350);
+        return;
+      }
       // Re-show spotlight now that target is found
-      const sp2 = document.getElementById('mgkTutorialSpotlight');
-      if (sp2) sp2.style.opacity = '1';
+      const sp2 = document.getElementById("mgkTutorialSpotlight");
+      if (sp2) sp2.style.opacity = "1";
       TutorialManager._attach(el, step, n);
     };
     tryAttach();
@@ -4978,12 +5468,12 @@ const TutorialManager = {
   _resizeObserver: null,
 
   _updateSpotlight(el, pad) {
-    const sp = document.getElementById('mgkTutorialSpotlight');
+    const sp = document.getElementById("mgkTutorialSpotlight");
     if (!sp) return;
     const rect = el.getBoundingClientRect();
-    sp.style.left   = `${rect.left   - pad}px`;
-    sp.style.top    = `${rect.top    - pad}px`;
-    sp.style.width  = `${rect.width  + pad * 2}px`;
+    sp.style.left = `${rect.left - pad}px`;
+    sp.style.top = `${rect.top - pad}px`;
+    sp.style.width = `${rect.width + pad * 2}px`;
     sp.style.height = `${rect.height + pad * 2}px`;
   },
 
@@ -5000,12 +5490,14 @@ const TutorialManager = {
 
     // Position spotlight + keep it live as element resizes
     TutorialManager._updateSpotlight(el, pad);
-    TutorialManager._resizeObserver = new ResizeObserver(() => TutorialManager._updateSpotlight(el, pad));
+    TutorialManager._resizeObserver = new ResizeObserver(() =>
+      TutorialManager._updateSpotlight(el, pad)
+    );
     TutorialManager._resizeObserver.observe(el);
     // Also poll with rAF for position changes (scroll / modal slide-in)
     let rafId;
     const trackPos = () => {
-      if (!document.getElementById('mgkTutorialSpotlight')) return;
+      if (!document.getElementById("mgkTutorialSpotlight")) return;
       TutorialManager._updateSpotlight(el, pad);
       rafId = requestAnimationFrame(trackPos);
     };
@@ -5016,75 +5508,96 @@ const TutorialManager = {
     // Lift target above overlay
     const prevZ = el.style.zIndex;
     const prevPos = el.style.position;
-    if (!el.style.position || el.style.position === 'static') el.style.position = 'relative';
-    el.style.zIndex = '100000';
+    if (!el.style.position || el.style.position === "static")
+      el.style.position = "relative";
+    el.style.zIndex = "100000";
 
     // Build tooltip
-    const tt = document.getElementById('mgkTutorialTooltip');
+    const tt = document.getElementById("mgkTutorialTooltip");
     if (!tt) return;
-    const isGotIt = step.advance === 'gotit';
+    const isGotIt = step.advance === "gotit";
     tt.innerHTML = `
       <div>${step.text}</div>
       <div class="mgk-tut-footer">
         <span class="mgk-tut-step">${n + 1} / ${total}</span>
         <button class="mgk-tut-skip">Skip tutorial</button>
-        ${isGotIt ? '<button class="UiButton -gradient mgk-tut-gotit">Got it</button>' : ''}
+        ${isGotIt ? '<button class="UiButton -gradient mgk-tut-gotit">Got it</button>' : ""}
       </div>`;
 
     // Position tooltip
-    const ttW = 280, ttH = 120, vp = 10;
+    const ttW = 280,
+      ttH = 120,
+      vp = 10;
     let L, T;
-    if (step.pos === 'top')    { L = rect.left + rect.width/2 - ttW/2;  T = rect.top - ttH - 14; }
-    else if (step.pos === 'bottom') { L = rect.left + rect.width/2 - ttW/2; T = rect.bottom + 14; }
-    else if (step.pos === 'left')   { L = rect.left - ttW - 14; T = rect.top + rect.height/2 - ttH/2; }
-    else                            { L = rect.right + 14;      T = rect.top + rect.height/2 - ttH/2; }
-    L = Math.max(vp, Math.min(L, window.innerWidth  - ttW - vp));
+    if (step.pos === "top") {
+      L = rect.left + rect.width / 2 - ttW / 2;
+      T = rect.top - ttH - 14;
+    } else if (step.pos === "bottom") {
+      L = rect.left + rect.width / 2 - ttW / 2;
+      T = rect.bottom + 14;
+    } else if (step.pos === "left") {
+      L = rect.left - ttW - 14;
+      T = rect.top + rect.height / 2 - ttH / 2;
+    } else {
+      L = rect.right + 14;
+      T = rect.top + rect.height / 2 - ttH / 2;
+    }
+    L = Math.max(vp, Math.min(L, window.innerWidth - ttW - vp));
     T = Math.max(vp, Math.min(T, window.innerHeight - ttH - vp));
     tt.style.left = `${L}px`;
-    tt.style.top  = `${T}px`;
+    tt.style.top = `${T}px`;
 
     // Restore element styles helper
     const restore = () => {
       el.style.zIndex = prevZ;
       el.style.position = prevPos;
-      if (TutorialManager._resizeObserver) { TutorialManager._resizeObserver.disconnect(); TutorialManager._resizeObserver = null; }
+      if (TutorialManager._resizeObserver) {
+        TutorialManager._resizeObserver.disconnect();
+        TutorialManager._resizeObserver = null;
+      }
       cancelAnimationFrame(TutorialManager._rafId);
     };
 
     // Wire skip
-    tt.querySelector('.mgk-tut-skip').onclick = () => TutorialManager.finish();
+    tt.querySelector(".mgk-tut-skip").onclick = () => TutorialManager.finish();
 
     // Wire advance
     if (isGotIt) {
-      tt.querySelector('.mgk-tut-gotit').onclick = () => { restore(); TutorialManager.finish(); };
-    } else if (step.advance === 'child') {
+      tt.querySelector(".mgk-tut-gotit").onclick = () => {
+        restore();
+        TutorialManager.finish();
+      };
+    } else if (step.advance === "child") {
       // Listen for a click on any matching child (deck items added dynamically)
       const onChildClick = (e) => {
         if (e.target.closest(step.childSel)) {
-          el.removeEventListener('click', onChildClick);
+          el.removeEventListener("click", onChildClick);
           restore();
           setTimeout(() => TutorialManager._goToStep(n + 1), 350);
         }
       };
-      el.addEventListener('click', onChildClick);
+      el.addEventListener("click", onChildClick);
     } else {
       const onElClick = () => {
-        el.removeEventListener('click', onElClick);
+        el.removeEventListener("click", onElClick);
         restore();
         setTimeout(() => TutorialManager._goToStep(n + 1), 350);
       };
-      el.addEventListener('click', onElClick);
+      el.addEventListener("click", onElClick);
     }
   },
 
   finish() {
     clearTimeout(TutorialManager._pendingTimer);
     cancelAnimationFrame(TutorialManager._rafId);
-    if (TutorialManager._resizeObserver) { TutorialManager._resizeObserver.disconnect(); TutorialManager._resizeObserver = null; }
+    if (TutorialManager._resizeObserver) {
+      TutorialManager._resizeObserver.disconnect();
+      TutorialManager._resizeObserver = null;
+    }
     Storage.saveSettings({ tutorialDone: true });
-    document.getElementById('mgkTutorialOverlay')?.remove();
-    document.getElementById('mgkTutorialSpotlight')?.remove();
-    document.getElementById('mgkTutorialTooltip')?.remove();
+    document.getElementById("mgkTutorialOverlay")?.remove();
+    document.getElementById("mgkTutorialSpotlight")?.remove();
+    document.getElementById("mgkTutorialTooltip")?.remove();
   },
 };
 
@@ -5097,7 +5610,11 @@ async function initializeMigakuExporter() {
     await new Promise((resolve) => {
       const checkForApp = () => {
         // he needs to wait until one language is selected to check if the app is fully loaded
-        if (document.querySelector("main.MIGAKU-SRS")?.getAttribute?.("data-mgk-lang-selected")) {
+        if (
+          document
+            .querySelector("main.MIGAKU-SRS")
+            ?.getAttribute?.("data-mgk-lang-selected")
+        ) {
           resolve();
         } else {
           setTimeout(checkForApp, 500);
@@ -5108,7 +5625,8 @@ async function initializeMigakuExporter() {
 
     let SQL;
     SQL = await initSqlJs({
-      locateFile: () => 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.13.0/sql-wasm.wasm'
+      locateFile: () =>
+        "https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.13.0/sql-wasm.wasm",
     });
 
     window._mgkSqlJs = SQL;
@@ -5116,7 +5634,10 @@ async function initializeMigakuExporter() {
     // load the main database
     const raw = await DatabaseOps.loadRawSrsDatabaseBlob();
     if (!raw) {
-      Utils.setStatus("Unable to open Migaku DB (srs). Make sure the site is loaded.", "#ef4444");
+      Utils.setStatus(
+        "Unable to open Migaku DB (srs). Make sure the site is loaded.",
+        "#ef4444"
+      );
       return;
     }
 
@@ -5129,7 +5650,10 @@ async function initializeMigakuExporter() {
 
     // populate deck list
     const decks = DatabaseOps.listDecks(globalSqlDbHandle);
-    const lang = document.querySelector("main.MIGAKU-SRS")?.getAttribute?.("data-mgk-lang-selected") || null;
+    const lang =
+      document
+        .querySelector("main.MIGAKU-SRS")
+        ?.getAttribute?.("data-mgk-lang-selected") || null;
     UI.populateDeckListAndWire(decks, lang);
 
     // default export settings
@@ -5148,9 +5672,8 @@ async function initializeMigakuExporter() {
       mergeSelected: false,
       useTemplates: true,
       fileSizePreset: "normal",
-      ...Storage.loadSettings()
+      ...Storage.loadSettings(),
     };
-
 
     const applyToCheckbox = (id, value) => {
       const el = Utils.safeGetElement(id);
@@ -5177,153 +5700,192 @@ async function initializeMigakuExporter() {
     applyToCheckbox("mgkMergeSelected", settings.mergeSelected);
     applyToCheckbox("mgkUseTemplates", settings.useTemplates);
 
-
-    Utils.safeAddListener(Utils.safeGetElement("mgkExportDeckBtn"), "click", async () => {
-      const hidden = Utils.safeGetElement("mgkDeckSelectHidden");
-      const selCsv = hidden?.value || "";
-      if (!selCsv) {
-        Utils.setStatus("No deck selected", "#ef4444");
-        return;
-      }
-
-      const ids = selCsv.split(",").map(s => s.trim()).filter(Boolean);
-      if (ids.length === 0) {
-        Utils.setStatus("No deck selected", "#ef4444");
-        return;
-      }
-
-      const simple = Utils.safeGetElement("mgkSimpleMode")?.checked ?? true;
-      let opts = {};
-      const keepSyntax = Utils.safeGetElement("mgkKeepSyntax")?.checked ?? false;
-      const includeImages = Utils.safeGetElement("mgkIncludeImages")?.checked ?? true;
-      const includeAudio = Utils.safeGetElement("mgkIncludeAudio")?.checked ?? true;
-
-      if (simple) {
-        const presetMenu = Utils.safeGetElement("mgkPresetMenu");
-        const sel = presetMenu?.querySelector(".mgk-preset-item.selected")?.dataset?.preset || "normal";
-        const mapping = CONFIG.PRESETS[sel] || CONFIG.PRESETS.normal;
-        opts = {
-          includeMedia: (includeImages || includeAudio),
-          includeImages,
-          includeAudio,
-          keepSyntax,
-          convertMedia: mapping.enableImageConversion || mapping.enableAudioConversion,
-          enableImageConversion: mapping.enableImageConversion,
-          imageMaxDimension: mapping.imageMaxDimension,
-          imageQuality: mapping.imageQuality,
-          enableAudioConversion: mapping.enableAudioConversion,
-          audioSampleRate: mapping.audioSampleRate,
-          maxMediaSizeBytes: (mapping.maxMediaSizeMB || 10) * 1024 * 1024,
-          mergeSelected: Utils.safeGetElement("mgkMergeSelected")?.checked ?? false,
-          useTemplates: Utils.safeGetElement("mgkUseTemplates")?.checked ?? true,
-          mediaWorkerCount: 5
-        };
-      } else {
-        opts = {
-          includeMedia: (includeImages || includeAudio),
-          includeImages,
-          includeAudio,
-          keepSyntax,
-          convertMedia: Utils.safeGetElement("mgkConvertMedia")?.checked ?? false,
-          enableImageConversion: true,
-          imageMaxDimension: parseInt(Utils.safeGetElement("mgkImageMaxDim")?.value || "1024"),
-          imageQuality: parseFloat(Utils.safeGetElement("mgkImageQuality")?.value || "0.85"),
-          enableAudioConversion: true,
-          audioSampleRate: parseInt(Utils.safeGetElement("mgkAudioSampleRate")?.value || "22050"),
-          maxMediaSizeBytes: (parseFloat(Utils.safeGetElement("mgkMaxMediaSize")?.value || "10") || 10) * 1024 * 1024,
-          mergeSelected: Utils.safeGetElement("mgkMergeSelected")?.checked ?? false,
-          useTemplates: Utils.safeGetElement("mgkUseTemplates")?.checked ?? true,
-          mediaWorkerCount: 5
-        };
-      }
-
-      // save settings to localStorage
-      Storage.saveSettings({
-        simpleMode: simple,
-        // Old skin toggle setting (fallback):
-        // nativeSkin: Utils.safeGetElement("mgkNativeSkin")?.checked ?? false,
-        includeImages: opts.includeImages,
-        includeAudio: opts.includeAudio,
-        keepSyntax: opts.keepSyntax,
-        convertMedia: opts.convertMedia,
-        enableImageConversion: opts.enableImageConversion,
-        imageMaxDimension: opts.imageMaxDimension,
-        imageQuality: opts.imageQuality,
-        enableAudioConversion: opts.enableAudioConversion,
-        audioSampleRate: opts.audioSampleRate,
-        maxMediaSizeMB: (opts.maxMediaSizeBytes || 0) / (1024 * 1024),
-        mergeSelected: opts.mergeSelected,
-        useTemplates: opts.useTemplates,
-        fileSizePreset: Utils.safeGetElement("mgkPresetMenu")?.querySelector(".mgk-preset-item.selected")?.dataset?.preset || "normal"
-      });
-
-      Utils.setStatus("Starting export(s)...", "#f59e0b");
-      Progress.show("Starting...", 0);
-
-      const mappings = Storage.loadMappings();
-      try {
-        await ExportProcessor.buildApkgsForSelection(
-          window._mgkSqlJs,
-          globalSqlDbHandle,
-          ids,
-          DatabaseOps.listDecks(globalSqlDbHandle),
-          opts,
-          mappings
-        );
-        Utils.setStatus("Exports completed successfully!", "#10b981");
-      } catch (e) {
-        console.error("Export failed", e);
-        Utils.setStatus("Export failed – see console for details", "#ef4444");
-      }
-      Progress.hide();
-    });
-
-    Utils.safeAddListener(Utils.safeGetElement("mgkExportWordlistBtn"), "click", async () => {
-      // First check language filter dropdown
-      const languageFilterEl = Utils.safeGetElement("mgkLanguageFilter");
-      let useLang = languageFilterEl?.value || null;
-
-      // Fall back to passed lang parameter or Migaku's selected language
-      if (!useLang) {
-        useLang = lang || document.querySelector("main.MIGAKU-SRS")?.getAttribute?.("data-mgk-lang-selected") || null;
-      }
-
-      // If still no language, try to get it from the decks
-      if (!useLang && globalSqlDbHandle) {
-        const decks = DatabaseOps.listDecks(globalSqlDbHandle);
-        const activeDeck = decks.find(d => !d.del && d.lang);
-        if (activeDeck) {
-          useLang = activeDeck.lang;
-          Utils.log(`Using language from deck: ${useLang}`);
+    Utils.safeAddListener(
+      Utils.safeGetElement("mgkExportDeckBtn"),
+      "click",
+      async () => {
+        const hidden = Utils.safeGetElement("mgkDeckSelectHidden");
+        const selCsv = hidden?.value || "";
+        if (!selCsv) {
+          Utils.setStatus("No deck selected", "#ef4444");
+          return;
         }
+
+        const ids = selCsv
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+        if (ids.length === 0) {
+          Utils.setStatus("No deck selected", "#ef4444");
+          return;
+        }
+
+        const simple = Utils.safeGetElement("mgkSimpleMode")?.checked ?? true;
+        let opts = {};
+        const keepSyntax =
+          Utils.safeGetElement("mgkKeepSyntax")?.checked ?? false;
+        const includeImages =
+          Utils.safeGetElement("mgkIncludeImages")?.checked ?? true;
+        const includeAudio =
+          Utils.safeGetElement("mgkIncludeAudio")?.checked ?? true;
+
+        if (simple) {
+          const presetMenu = Utils.safeGetElement("mgkPresetMenu");
+          const sel =
+            presetMenu?.querySelector(".mgk-preset-item.selected")?.dataset
+              ?.preset || "normal";
+          const mapping = CONFIG.PRESETS[sel] || CONFIG.PRESETS.normal;
+          opts = {
+            includeMedia: includeImages || includeAudio,
+            includeImages,
+            includeAudio,
+            keepSyntax,
+            convertMedia:
+              mapping.enableImageConversion || mapping.enableAudioConversion,
+            enableImageConversion: mapping.enableImageConversion,
+            imageMaxDimension: mapping.imageMaxDimension,
+            imageQuality: mapping.imageQuality,
+            enableAudioConversion: mapping.enableAudioConversion,
+            audioSampleRate: mapping.audioSampleRate,
+            maxMediaSizeBytes: (mapping.maxMediaSizeMB || 10) * 1024 * 1024,
+            mergeSelected:
+              Utils.safeGetElement("mgkMergeSelected")?.checked ?? false,
+            useTemplates:
+              Utils.safeGetElement("mgkUseTemplates")?.checked ?? true,
+            mediaWorkerCount: 5,
+          };
+        } else {
+          opts = {
+            includeMedia: includeImages || includeAudio,
+            includeImages,
+            includeAudio,
+            keepSyntax,
+            convertMedia:
+              Utils.safeGetElement("mgkConvertMedia")?.checked ?? false,
+            enableImageConversion: true,
+            imageMaxDimension: parseInt(
+              Utils.safeGetElement("mgkImageMaxDim")?.value || "1024"
+            ),
+            imageQuality: parseFloat(
+              Utils.safeGetElement("mgkImageQuality")?.value || "0.85"
+            ),
+            enableAudioConversion: true,
+            audioSampleRate: parseInt(
+              Utils.safeGetElement("mgkAudioSampleRate")?.value || "22050"
+            ),
+            maxMediaSizeBytes:
+              (parseFloat(
+                Utils.safeGetElement("mgkMaxMediaSize")?.value || "10"
+              ) || 10) *
+              1024 *
+              1024,
+            mergeSelected:
+              Utils.safeGetElement("mgkMergeSelected")?.checked ?? false,
+            useTemplates:
+              Utils.safeGetElement("mgkUseTemplates")?.checked ?? true,
+            mediaWorkerCount: 5,
+          };
+        }
+
+        // save settings to localStorage
+        Storage.saveSettings({
+          simpleMode: simple,
+          // Old skin toggle setting (fallback):
+          // nativeSkin: Utils.safeGetElement("mgkNativeSkin")?.checked ?? false,
+          includeImages: opts.includeImages,
+          includeAudio: opts.includeAudio,
+          keepSyntax: opts.keepSyntax,
+          convertMedia: opts.convertMedia,
+          enableImageConversion: opts.enableImageConversion,
+          imageMaxDimension: opts.imageMaxDimension,
+          imageQuality: opts.imageQuality,
+          enableAudioConversion: opts.enableAudioConversion,
+          audioSampleRate: opts.audioSampleRate,
+          maxMediaSizeMB: (opts.maxMediaSizeBytes || 0) / (1024 * 1024),
+          mergeSelected: opts.mergeSelected,
+          useTemplates: opts.useTemplates,
+          fileSizePreset:
+            Utils.safeGetElement("mgkPresetMenu")?.querySelector(
+              ".mgk-preset-item.selected"
+            )?.dataset?.preset || "normal",
+        });
+
+        Utils.setStatus("Starting export(s)...", "#f59e0b");
+        Progress.show("Starting...", 0);
+
+        const mappings = Storage.loadMappings();
+        try {
+          await ExportProcessor.buildApkgsForSelection(
+            window._mgkSqlJs,
+            globalSqlDbHandle,
+            ids,
+            DatabaseOps.listDecks(globalSqlDbHandle),
+            opts,
+            mappings
+          );
+          Utils.setStatus("Exports completed successfully!", "#10b981");
+        } catch (e) {
+          console.error("Export failed", e);
+          Utils.setStatus("Export failed – see console for details", "#ef4444");
+        }
+        Progress.hide();
       }
+    );
 
-      Utils.setStatus("Exporting wordlists...", "#f59e0b");
-      await ExportProcessor.exportWordlists(globalSqlDbHandle, useLang);
-    });
+    Utils.safeAddListener(
+      Utils.safeGetElement("mgkExportWordlistBtn"),
+      "click",
+      async () => {
+        // First check language filter dropdown
+        const languageFilterEl = Utils.safeGetElement("mgkLanguageFilter");
+        let useLang = languageFilterEl?.value || null;
 
+        // Fall back to passed lang parameter or Migaku's selected language
+        if (!useLang) {
+          useLang =
+            lang ||
+            document
+              .querySelector("main.MIGAKU-SRS")
+              ?.getAttribute?.("data-mgk-lang-selected") ||
+            null;
+        }
+
+        // If still no language, try to get it from the decks
+        if (!useLang && globalSqlDbHandle) {
+          const decks = DatabaseOps.listDecks(globalSqlDbHandle);
+          const activeDeck = decks.find((d) => !d.del && d.lang);
+          if (activeDeck) {
+            useLang = activeDeck.lang;
+            Utils.log(`Using language from deck: ${useLang}`);
+          }
+        }
+
+        Utils.setStatus("Exporting wordlists...", "#f59e0b");
+        await ExportProcessor.exportWordlists(globalSqlDbHandle, useLang);
+      }
+    );
 
     Utils.setStatus("Migaku Exporter loaded successfully!", "#10b981");
     Utils.log("Initialization complete");
     TutorialManager.maybeStart();
-
   } catch (error) {
     console.error("[MGK] Initialization failed:", error);
-    Utils.setStatus("Initialization failed - check console for details", "#ef4444");
+    Utils.setStatus(
+      "Initialization failed - check console for details",
+      "#ef4444"
+    );
   }
 }
 
-
 // global error handling
 
-
-window.addEventListener('error', (event) => {
-  console.error('[MGK] Global error caught:', event.error);
+window.addEventListener("error", (event) => {
+  console.error("[MGK] Global error caught:", event.error);
   Utils.setStatus("An error occurred - check console", "#ef4444");
 });
 
-window.addEventListener('unhandledrejection', (event) => {
-  console.error('[MGK] Unhandled promise rejection:', event.reason);
+window.addEventListener("unhandledrejection", (event) => {
+  console.error("[MGK] Unhandled promise rejection:", event.reason);
   Utils.setStatus("Promise rejection - check console", "#ef4444");
 });
 
@@ -5344,14 +5906,13 @@ window.migakuExporterV3 = {
   DeckProtection,
   TutorialManager,
   initializeMigakuExporter,
-  CONFIG
+  CONFIG,
 };
 
 // startup + recovery logic (in case migaku's page loads weird)
 (function robustMigakuLauncher() {
-
-  window.addEventListener('error', (event) => {
-    console.error('[MGK] Global error:', event.error);
+  window.addEventListener("error", (event) => {
+    console.error("[MGK] Global error:", event.error);
   });
 
   window.migakuExporter = window.migakuExporterV3;
@@ -5368,7 +5929,10 @@ window.migakuExporterV3 = {
       Utils.log("initialized successfully");
     } catch (err) {
       console.error("[MGK] Initialization failed:", err);
-      Utils.setStatus("Initialization failed - attempting recovery...", "#ef4444");
+      Utils.setStatus(
+        "Initialization failed - attempting recovery...",
+        "#ef4444"
+      );
 
       // Try to recover by checking if UI exists and recreating if needed
       const recoveryInterval = setInterval(() => {
@@ -5378,8 +5942,10 @@ window.migakuExporterV3 = {
           if (!Utils.safeGetElement(CONFIG.MODAL_ID)) {
             try {
               UI.createMainUI();
-              Utils.log(`[MGK] UI created by recovery (attempt ${recoveryAttempts})`);
-            } catch(e) {
+              Utils.log(
+                `[MGK] UI created by recovery (attempt ${recoveryAttempts})`
+              );
+            } catch (e) {
               console.error("[MGK] UI creation failed during recovery", e);
             }
           }
@@ -5389,13 +5955,18 @@ window.migakuExporterV3 = {
             Utils.setStatus("Initialized (recovered)", "#f59e0b");
             clearInterval(recoveryInterval);
           }
-        } catch(e) {
+        } catch (e) {
           console.error("[MGK] Recovery attempt failed", e);
         }
 
         if (recoveryAttempts >= maxRecoveryAttempts) {
-          console.warn(`[MGK] Recovery abandoned after ${recoveryAttempts} attempts`);
-          Utils.setStatus("Recovery failed - try refreshing the page", "#ef4444");
+          console.warn(
+            `[MGK] Recovery abandoned after ${recoveryAttempts} attempts`
+          );
+          Utils.setStatus(
+            "Recovery failed - try refreshing the page",
+            "#ef4444"
+          );
           clearInterval(recoveryInterval);
         }
       }, 500);
@@ -5403,5 +5974,4 @@ window.migakuExporterV3 = {
   };
 
   tryInitialization();
-
 })();
