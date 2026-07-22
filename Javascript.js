@@ -4,7 +4,7 @@
 // @match       https://study.migaku.com/*
 // @grant       GM_getResourceURL
 // @run-at      document-idle
-// @version     2.2
+// @version     2.3
 // @author      waraki (Forked From SirOlaf)
 // @description Migaku → Anki exporter
 // @require     data:application/javascript,%3BglobalThis.setImmediate%3DsetTimeout%3B
@@ -3020,8 +3020,15 @@ const ExportProcessor = {
 
         // Migaku doesn't have separate learning queues like Anki
         // All reviewed cards are just "review" cards with different intervals
-        var cardTypeNum = card.reviewCount == 0 ? 0 : 2;
-        var cardQueueNum = cardTypeNum;
+        var isReviewed =
+          card.reviewCount > 0 ||
+          card.passCount > 0 ||
+          card.failCount > 0 ||
+          (card.interval && card.interval > 0) ||
+          (card.lastReview && card.lastReview > 0);
+
+        var cardTypeNum = isReviewed ? 2 : 0;
+        var cardQueueNum = card.suspended ? -1 : cardTypeNum;
         var due = 0;
         var interval = 0;
 
