@@ -1,0 +1,40 @@
+{
+  "manifest_version": 3,
+  "name": "Migaku Exporter",
+  "version": "2.0",
+  "description": "Export Migaku SRS flashcard decks to Anki .apkg format",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": [
+    "webNavigation"
+  ],
+  "host_permissions": [
+    "https://securetoken.googleapis.com/*",
+    "https://api.openai.com/*",
+    "https://file-sync-worker-api.migaku.com/*",
+    "https://raw.githubusercontent.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://study.migaku.com/*"],
+      "js": [
+        "lib/jszip.min.js",
+        "lib/sql-wasm.js",
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["lib/sql-wasm.wasm"],
+      "matches": ["https://study.migaku.com/*"]
+    }
+  ]
+}
